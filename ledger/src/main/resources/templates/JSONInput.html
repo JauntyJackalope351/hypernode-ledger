@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}"></title>
+    <script type="text/javascript" src="/script.js"></script>
+</head>
+<body>
+<h1 th:text="${title}"></h1>
+<h4 th:text="${info}"></h4>
+<form th:data-endpoint="${apiEndpoint}">
+    <label for="jsonInput" th:text="${jsonLabel}"></label><br/>
+    <textarea id="jsonInput" name="jsonInput" rows="10" cols="50" required th:text="${jsonDefault}">
+        </textarea><br/><br/>
+    <button type="submit">Send</button>
+</form>
+
+<div id="responseMessage" style="margin-top: 20px;"></div>
+</body>
+</html>

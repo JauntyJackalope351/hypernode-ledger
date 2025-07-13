@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>&#9650; Hypernode, a free decentralized ledger &#9650;</title>
+    <style>
+        /* Professional late 90s style */
+        body {
+            font-family: 'Arial', 'Verdana', sans-serif;
+            background-color: #E0E0E0; /* Light gray */
+            color: #333333; /* Dark gray text */
+            margin: 0;
+            padding: 0;
+            text-align: center;
+        }
+
+        .container {
+            width: 70%; /* A bit narrower for a focused look */
+            margin: 40px auto; /* Centered with more vertical space */
+            background-color: #FFFFFF; /* Clean white background for content */
+            border: 1px solid #999999; /* Simple border */
+            padding: 30px;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.2); /* Subtle shadow */
+            text-align: left; /* Content aligned left within container */
+        }
+
+        h1 {
+            color: #000080; /* Dark blue */
+            font-size: 2.2em;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #CCCCCC; /* Subtle separator */
+            padding-bottom: 10px;
+            text-align: center; /* Title centered */
+        }
+
+        h2 {
+            color: #006600; /* Dark green for section headings */
+            font-size: 1.6em;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed #DDDDDD; /* Light dashed line */
+            padding-bottom: 5px;
+        }
+
+        p {
+            line-height: 1.6; /* Better readability */
+            margin-bottom: 15px;
+        }
+
+        a {
+            color: #0000FF; /* Standard blue links */
+            text-decoration: underline;
+        }
+
+        a:hover {
+            color: #CC0000; /* Red on hover */
+        }
+
+        ul {
+            list-style-type: square; /* Simple square bullets */
+            padding-left: 20px;
+            margin-top: 10px;
+        }
+
+        ul li {
+            margin-bottom: 8px;
+        }
+
+        ul li a {
+            font-weight: bold;
+            text-decoration: none; /* No underline for list links by default */
+        }
+
+        ul li a:hover {
+            text-decoration: underline; /* Underline on hover for list links */
+        }
+
+        .footer {
+            background-color: #666666;
+            color: #FFFFFF;
+            padding: 15px 0;
+            font-size: 0.8em;
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container {
+                width: 90%;
+                margin: 20px auto;
+                padding: 20px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            h2 {
+                font-size: 1.4em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Hypernode, a free decentralized ledger</h1>
+
+<p>This project aims to create a distributed ledger with the goal of illustrating the Hypernode validation algorithm.<br>
+It is a Proof of Stake system that supports delegation, can scale well, requires little power,supports multiple signing
+algorithms(tested with RSA and ML-DSA-87),can relay messages and has a built-in voting system to update its own ledger parameters.</p><p>
+It was written from scratch in Java using the Spring framework, as it is a very easy language to read, understand and validate.
+One of the reason for the creation of this program was that the Bitcoin code was not intuitive to read or easy to deploy,
+so auditability and ease of startup were important objectives of this project.</p><p>
+Ease of use and security were considered, as you need both a signature from the user (like chip and pin)
+and from your validator node (which acts like a sort of bank), so that incidents like MtGox cannot happen anymore.
+You then get the ease of use of having normal people operate thin clients while the validator nodes do the heavy lifting,
+but at the same time a motivated user has the option to run his own validator node.<br>
+The power and computation were also a concern, especially as that GPU power could now be allocated to AI.
+Another reason I was not fully happy with Bitcoin was the lack of an internal formal voting system, and the inability to
+issue new currency without recurring to an hard fork.</p><p>
+Since the delegated validator nodes vote to manage monetary policy this is, in fact, a democratic instrument.
+If you so desire you do not even need the Internet to run this kind of ledger, you could run one entirely via avian carriers,
+therefore becoming an important asset for communities that can't or won't connect to the mainstream Internet. </p>
+
+
+        <h2>Project Links</h2>
+        <ul>
+            <li><a href="readme.txt">Readme</a> - The main documentation of the project.</li>
+            <li><a href="ledger.jar">Java applet</a> - The actual Java application - md5:e775deb230e4f015cf3e968934a7524c</li>
+            <li><a href="ledger/">Uncompressed source code</a> - View the source code directly from the website</li>
+            <li><a href="ledger.zip">Compressed source code</a> - Download the source code as a zip file - md5:8168a6d7212ad995bfa0a8add5af7630</li>
+            <li><a href="quickstart.pdf">Quick start</a> - Illustrated documentation on how to operate the program</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2025 Hypernode Team</p>
+    </div>
+
+</body>
+</html>

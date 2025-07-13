@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Server admin page</title>
+</head>
+<body>
+<h1>Server admin page</h1>
+<h4 th:text="${publicKey}? 'EncryptionEntity public key : '+${publicKey}  : 'EncryptionEntity Not configured'">Placeholder</h4>
+<h4 th:text="${lastHash}? 'Ledger last hash : '+${lastHash}  : 'Ledger Not configured'">Placeholder</h4>
+<p>
+    Set the EncryptionEntity:
+    <a href="/server/setEncryptionEntityIntegrated">Integrated</a> or <a href="/server/setEncryptionEntityExternalServer">External</a><br>
+    After then you can either
+    <a href="/server/createNewLedger">Create new Ledger</a> or
+    <a href="server/joinExistingLedger">Join existing Ledger</a>.<br>
+    Once your system is configured, you are ready to start transacting.
+    <a href="/server/changeVotedParameters">Vote to change ledger settings</a>
+    <a href="/server/voteDelegation">Receive voting delegations</a>
+    <a href="/server/spend">Receive spend messages</a>
+</p>
+</body>
+</html>
+
+

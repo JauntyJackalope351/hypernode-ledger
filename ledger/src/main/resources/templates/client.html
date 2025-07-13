@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Client page</title>
+</head>
+<body>
+<h1>Client page</h1>
+<h4 th:text="${publicKey}? 'EncryptionEntity public key : '+${publicKey}  : 'EncryptionEntity Not configured'">Placeholder</h4>
+<h4 th:text="${endpoint}? 'Endpoint : '+${endpoint}  : 'Endpoint Not configured'">Placeholder</h4>
+<p>
+    Set the EncryptionEntity:
+    <a href="/client/setEncryptionEntityIntegrated">Integrated</a> or <a href="/client/setEncryptionEntityExternalServer">External</a><br>
+    And then
+    <a href="/client/setEndpoint">Set the Connection String</a> for your reference server.<br>
+    Once your system is configured, you are ready to start transacting.
+    <a href="/client/getAccountTotals"> View account totals</a>
+    <a href="/client/clientPay"> Make a payment</a>
+    <a href="/client/clientVoteDelegation">Create voting delegations</a>
+    Or create messages to post later <a href="/client/clientPay">Create payment messages</a>
+    <a href="/client/clientVoteDelegation">Create voting delegations</a>
+</p>
+</body>
+</html>
