@@ -10,6 +10,7 @@ public class AccountAttributesUpdate
 {
     private String from;
     private String name;
+    private String description;
     private String delegated;
     private int blockId;
     private String previousBlockHash;
@@ -46,12 +47,23 @@ public class AccountAttributesUpdate
             this.name = name.substring(0, maxLength);
         }
     }
+    public String getDescription() {return description;}
+    public void setDescription(String description)
+    {
+        int maxLength = 2000;
+        if (description == null || description.length() <= maxLength) {
+            this.description = description;
+        } else {
+            this.description = description.substring(0, maxLength);
+        }
+    }
 
     @JsonCreator
     public static AccountAttributesUpdate create
             (
                     @JsonProperty("from") String publicKeyFrom,               // Maps to "publicKeyFrom" in JSON
                     @JsonProperty("name") String name,               // Maps to "publicKeyFrom" in JSO
+                    @JsonProperty("description") String description,               // Maps to "publicKeyFrom" in JSO
                     @JsonProperty("delegated") String publicKeyDelegated,     // Maps to "publicKeyDelegated" in JSON
                     @JsonProperty("blockId") int blockId,                             // Maps to "blockId" in JSON
                     @JsonProperty("previousRevisionHash") String previousRevisionHash, // Maps to "previousRevisionHash" in JSON
@@ -61,6 +73,7 @@ public class AccountAttributesUpdate
         AccountAttributesUpdate _this = new AccountAttributesUpdate();
         _this.from = publicKeyFrom;
         _this.setName(name);
+        _this.setDescription(description);
         _this.delegated = publicKeyDelegated;
         _this.blockId = blockId;
         _this.previousBlockHash = previousRevisionHash;
@@ -72,6 +85,7 @@ public class AccountAttributesUpdate
     {
         return  "publicKey:"+this.getFrom() +
                 "name:"+this.getName()+
+                "description:"+this.getDescription()+
                 "delegated:"+this.getDelegated() +
                 "blockId:"+this.getBlockId() +
                 "previousBlockHash:"+this.getPreviousBlockHash() +
@@ -83,6 +97,7 @@ public class AccountAttributesUpdate
     {
         return  this.getFrom() +
                 ":"+this.getName()+
+                ":"+this.getDescription()+
                 ":"+this.getDelegated() +
                 ":"+this.getBlockId() +
                 ":"+this.getPreviousBlockHash() +

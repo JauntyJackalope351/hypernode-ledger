@@ -83,13 +83,14 @@ public class Payment
 
                     DistributedLedgerAccount old =  _setDistributedLedgerAccount.stream()
                             .filter(d -> d.getPublicKey().equals(a)).findFirst()
-                            .orElse(DistributedLedgerAccount.create(a,"",BigDecimal.ZERO,a));
+                            .orElse(DistributedLedgerAccount.create(a,"",BigDecimal.ZERO,a,""));
                     return DistributedLedgerAccount.create(old.getPublicKey(),
                             old.getName(),
                             old.getAmount()
                                 .add(to.getOrDefault(a, BigDecimal.ZERO))
                                 .subtract(from.getOrDefault(a, BigDecimal.ZERO)),
-                        old.getValidatorNode());
+                                old.getValidatorNode(),
+                            old.getDescription());
                 }
                 ).filter(c -> c.getAmount().compareTo(BigDecimal.ZERO)>0).collect(Collectors.toSet())
         );

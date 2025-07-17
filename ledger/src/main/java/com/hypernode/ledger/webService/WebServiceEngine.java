@@ -298,12 +298,14 @@ public class WebServiceEngine {
         return validPayments;
     }
 
-    public void notifyupdateAccountAttributes(AccountAttributesUpdate _accountAttributesUpdate)
+    public String notifyupdateAccountAttributes(AccountAttributesUpdate _accountAttributesUpdate)
     {
         if(_accountAttributesUpdate.validate(this.statusDataContract.getId()+1, Encryption.hash(this.statusDataContract.getStringToSign())))
         {
             this.pendingNextMessage.getVotingDelegationSet().add(_accountAttributesUpdate);
+            return "OK";
         }
+        return "Invalid update";
     }
 
     public BigDecimal getAmountAvailable(String publicKey)
