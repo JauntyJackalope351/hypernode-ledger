@@ -19,6 +19,7 @@ public class DistributedLedgerAccount
     private String publicKey = "";
     private BigDecimal amount;
     private String validatorNode;
+    private String description;
 
     public static DistributedLedgerAccount find(Set<DistributedLedgerAccount> _set, String _publicKeyFrom)
     {
@@ -42,6 +43,8 @@ public class DistributedLedgerAccount
         Map<String,String> delegationsString = _delegations.stream().collect(Collectors.toMap(AccountAttributesUpdate::getFrom, AccountAttributesUpdate::getDelegated));
         Map<String,String> newName = _delegations.stream().collect(Collectors.toMap(AccountAttributesUpdate::getFrom, AccountAttributesUpdate::getName));
         Set<String> existingNames = _currencies.stream().map(DistributedLedgerAccount::getName).collect(Collectors.toSet());
+        Map<String,String> newDescription = _delegations.stream().collect(Collectors.toMap(AccountAttributesUpdate::getFrom, AccountAttributesUpdate::getDescription));
+
 
         final Map<String,String> finalNewName = newName.entrySet().stream()
                 .collect(Collectors.groupingBy(Map.Entry::getValue, Collectors.toList()))
@@ -55,7 +58,7 @@ public class DistributedLedgerAccount
         Set<DistributedLedgerAccount> update = _currencies.stream().filter(c -> delegationsString.containsKey(c.getPublicKey())).collect(Collectors.toSet());
         ret.removeAll(update);
         ret.addAll(update.stream().map(c -> DistributedLedgerAccount
-                .create(c.getPublicKey(),finalNewName.getOrDefault(c.getPublicKey(),c.getName()),c.getAmount(),delegationsString.get(c.getPublicKey()))).collect(Collectors.toSet()));
+                .create(c.getPublicKey(),finalNewName.getOrDefault(c.getPublicKey(),c.getName()),c.getAmount(),delegationsString.get(c.getPublicKey()),newDescription.getOrDefault(c.getPublicKey(),c.getDescription()))).collect(Collectors.toSet()));
         return ret;
     }
 
@@ -70,7 +73,8 @@ public class DistributedLedgerAccount
                     @JsonProperty("publicKey") String publicKey,          // Maps to "publicKey" in JSON
                     @JsonProperty("name") String name,          // Maps to "publicKey" in JSON
                     @JsonProperty("amount") BigDecimal amount,             // Maps to "amount" in JSON
-                    @JsonProperty("validatorNode") String validatorNode
+                    @JsonProperty("validatorNode") String validatorNode,
+                    @JsonProperty("description") String description
             )
     {
         DistributedLedgerAccount distributedLedgerAccount = new DistributedLedgerAccount();
@@ -78,6 +82,7 @@ public class DistributedLedgerAccount
         distributedLedgerAccount.name = name;
         distributedLedgerAccount.amount = amount;
         distributedLedgerAccount.validatorNode = validatorNode;
+        distributedLedgerAccount.description = description;
         return distributedLedgerAccount;
     }
 
@@ -89,6 +94,7 @@ public class DistributedLedgerAccount
                 ",name=" + name +
                 ",amount=" + amount +
                 ",validatorNode=" + getValidatorNode() +
+                ",description=" + description +
                 '}';
     }
     public String uniqueString()
@@ -96,12 +102,15 @@ public class DistributedLedgerAccount
         return this.getPublicKey() +
                 ":" + name +
                 ":" + amount +
-                ":" + getValidatorNode();
+                ":" + getValidatorNode() +
+                ":" + description
+                ;
     }
     public String toJson() {
         return "{" +
                 "\"publicKeyFrom\"=\"" + this.getPublicKey() + "\",\n" +
                 "\"name\"=\"" + name + "\",\n" +
+                "\"description\"=\"" + description + "\",\n" +
                 "\"amount\"=\"" + amount + "\",\n" +
                 "\"validatorNode\"=\"" + getValidatorNode() + "\",\n" +
                 '}';
@@ -135,4 +144,13 @@ public class DistributedLedgerAccount
             this.name = name.substring(0,200);
         }
     }//TODO accountNameLength
+    public void setDescription(String description){
+        this.description = description;
+        if(description.length()>2000)
+        {
+            this.description = description.substring(0,2000);
+        }
+    }
+
+    public String getDescription() {return description;}
 }
