@@ -604,7 +604,7 @@ Here is a table comparing the options:
 [Latest version of this readme](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/readme.md) - The last version of the project documentation.  
 [Quick start guide](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/quickstart.pdf)  - Illustrated documentation on how to operate the program  
 [Community bootstrap guide (AI generated)](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/community_bootstrap.md)  - Some ideas on how to start your own community  
-[Java applet](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/ledger.jar) - The actual Java application - e8b8ea54d80293af1a41ca7eb71dff4d
+[Java applet](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/ledger.jar) - The actual Java application - 908a4bd7ce270d6903ef2729383f1944
 
 
 </details> 
