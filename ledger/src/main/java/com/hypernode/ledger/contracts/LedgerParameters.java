@@ -81,34 +81,32 @@ public class LedgerParameters
         // We're looking for the smallest 'exponent' such that we can find a 'groupSize'
         // that satisfies the conditions.
         int currentExponent = 1;
-        long currentProduct = maxConnections; // Use long to prevent overflow during intermediate calculations
+        int connections = (participants-1)*3;
 
         // The loop continues as long as the current grouping capacity isn't enough
         // and we haven't exceeded a reasonable exponent limit to prevent infinite loops
         // or extremely large calculations. A typical max exponent for practical
         // group distributions wouldn't be astronomically high.
-        while (currentProduct < participants) {
+        while (maxConnections < connections)
+        {
             currentExponent++;
+            int newConnections = (currentExponent * ((int) Math.ceil(Math.pow(participants, (1.0/currentExponent))-1)));
 
-            // Calculate the theoretical base needed for the current exponent
-            // We use long for intermediate division to preserve precision before ceiling
-            long theoreticalBase = (long) Math.ceil((double) maxConnections / currentExponent);
-
-            // Ensure the base is at least the exponent itself, to prevent base from becoming 1 prematurely
-            // which would cause an infinite loop if participants is large.
-            // This also implies a minimum size for a group in a hierarchical structure.
-            currentProduct = (long) Math.pow(Math.max(theoreticalBase, currentExponent), currentExponent);
+            if(newConnections >= connections) //if going up on one exponent does not lower the connections we reached the asymptotic area of the function
+            {
+                currentExponent--;
+                break;
+            }
+            connections = newConnections;
 
             // Safety break for extremely large exponents or if participants is unreachable
-            if (currentExponent > 60 && participants > currentProduct) { // ~60 is log2(Long.MAX_VALUE)
-                // This means participants is so large that even with a large exponent,
-                // we can't reach it, or the calculation is becoming impractical.
-                // Could throw an exception or set to max possible values.
+            if (currentExponent > 60) { // ~60 is log2(Long.MAX_VALUE)
                 throw new IllegalStateException("Could not find suitable group configuration within reasonable bounds.");
             }
+
         }
 
-        // After the loop, currentExponent is the first exponent that might work.
+        // After the loop, currentExponent is the first exponent that works.
         // Now, calculate the precise groupSize for this exponent.
         // We calculate the exponent-th root of participants and round up.
         int finalGroupSize = (int) Math.ceil(Math.pow(participants, 1.0 / currentExponent));

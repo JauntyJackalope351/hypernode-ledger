@@ -89,8 +89,9 @@ public class Payment
                             old.getAmount()
                                 .add(to.getOrDefault(a, BigDecimal.ZERO))
                                 .subtract(from.getOrDefault(a, BigDecimal.ZERO)),
-                                old.getValidatorNode(),
-                            old.getDescription());
+                            old.getValidatorNode(),
+                            old.getDescription()
+                        );
                 }
                 ).filter(c -> c.getAmount().compareTo(BigDecimal.ZERO)>0).collect(Collectors.toSet())
         );
