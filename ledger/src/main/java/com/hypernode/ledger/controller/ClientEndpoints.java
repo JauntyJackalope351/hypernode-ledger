@@ -255,16 +255,13 @@ public class ClientEndpoints {
      */
     @ResponseBody
     @PostMapping("/client/clientUpdateAccountAttributes")
-    public String clientUpdateAccountAttributes(@RequestBody AccountAttributesUpdate json)
-    {
-        String ret;
+    public String clientUpdateAccountAttributes(@RequestBody AccountAttributesUpdate json) {
 
-        json.setFrom(this.clientEngine.getEncryptionEntity().getPublicKey());
         json.setBlockId( this.clientEngine.getNextAvailablePaymentBlock()-1);
         json.setPreviousBlockHash( this.clientEngine.getStatus().getHash());
         try
         {
-            ret = clientEngine.changeVoteDelegation(json);
+            clientEngine.changeVoteDelegation(json);
         }
         catch (Exception e)
         {
@@ -280,13 +277,14 @@ public class ClientEndpoints {
     @GetMapping("/client/clientUpdateAccountAttributes")
     public String clientUpdateAccountAttributesPost(Model model) {
         model.addAttribute("apiEndpoint","/client/clientUpdateAccountAttributes");
-        model.addAttribute("title","Update account attributes");
+        model.addAttribute("title","Generate Vote Delegation");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
         model.addAttribute("jsonDefault","{\n" +
+                "\"from\": \"ACCOUNT_PUBLIC_KEY\",\n" +
                 "\"name\": \"ACCOUNT_NEW_NAME\",\n" +
                 "\"description\": \"ACCOUNT_DESCRIPTION\",\n" +
-                "\"delegated\": \"PUBLIC_KEY_SERVER\"\n" +
+                "\"delegated\": \"PUBLIC_KEY_SERVER\",\n" +
                 "}");
         return "JSONInput";
     }

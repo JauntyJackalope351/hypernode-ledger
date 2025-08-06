@@ -56,7 +56,7 @@ public class WebServiceEndpoints
     @ResponseBody
     @GetMapping("/version")
     public String getVersion() {
-        return "1.0.0.1";
+        return "1.0.0.0";
     }
 
     /**
@@ -556,8 +556,8 @@ public class WebServiceEndpoints
      */
     @ResponseBody
     @PostMapping("/updateAccountAttributes")
-    public String updateAccountAttributes(@RequestBody AccountAttributesUpdate _accountAttributesUpdate) {
-       return  webServiceEngine.notifyupdateAccountAttributes(_accountAttributesUpdate);
+    public void updateAccountAttributes(@RequestBody AccountAttributesUpdate _accountAttributesUpdate) {
+        webServiceEngine.notifyupdateAccountAttributes(_accountAttributesUpdate);
     }
 
     /**

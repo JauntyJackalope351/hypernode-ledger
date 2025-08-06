@@ -51,7 +51,7 @@ public class ClientEngine {
         return null;
     }
 
-    public String changeVoteDelegation(AccountAttributesUpdate json)
+    public void changeVoteDelegation(AccountAttributesUpdate json)
     {
         AccountAttributesUpdate accountAttributesUpdate = new AccountAttributesUpdate();
         accountAttributesUpdate.setFrom(this.encryptionEntity.getPublicKey());
@@ -61,7 +61,7 @@ public class ClientEngine {
         accountAttributesUpdate.setBlockId(json.getBlockId());
         accountAttributesUpdate.setPreviousBlockHash(json.getPreviousBlockHash());
         accountAttributesUpdate.setSignatureValue(this.encryptionEntity.signMessage(accountAttributesUpdate.getStringToSign()));
-        return WebServiceCaller.callServerMethodThrows(endpoint, "updateAccountAttributes", accountAttributesUpdate, new TypeReference<String>() {});
+        WebServiceCaller.callServerMethodThrows(endpoint, "updateAccountAttributes", accountAttributesUpdate, new TypeReference<AccountAttributesUpdate>() {});
     }
 
     public void setEndpoint(String endpoint) {this.endpoint = endpoint;}
