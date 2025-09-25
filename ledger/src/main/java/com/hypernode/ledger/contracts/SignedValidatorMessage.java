@@ -98,7 +98,8 @@ public class SignedValidatorMessage
         {
             return "";
         }
-        return Signature.listToString(_messages.stream().map(SignedValidatorMessage::getOriginalSignature).collect(Collectors.toSet()));
+        return _messages.stream().map(SignedValidatorMessage::uniqueString).sorted().collect(Collectors.joining("|"));
+        //return Signature.listToString(_messages.stream().map(SignedValidatorMessage::getOriginalSignature).collect(Collectors.toSet()));
     }
     @JsonIgnore
     public boolean validateSignature()

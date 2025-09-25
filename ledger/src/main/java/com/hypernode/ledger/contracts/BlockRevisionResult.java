@@ -126,7 +126,7 @@ public class BlockRevisionResult
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("error",false,e);
+            ErrorHandling.logEvent("error BlockRevisionResults.getResultingLedgerParameters",false,e);
             //something has gone wrong
         }
         return this.statusDataContractStarting.getLedgerParameters();

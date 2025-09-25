@@ -27,7 +27,7 @@ public class WebServiceCaller {
         }
         catch (RuntimeException e)
         {
-            ErrorHandling.logEvent("error",false,e);
+            ErrorHandling.logEvent("error webservicecaller.callServerMethod",false,e);
             //log.info("Swallowed exception ", e);
         }
         return null;
@@ -47,6 +47,12 @@ public class WebServiceCaller {
             if (!connectionString.endsWith("/")) {
                 connectionString = connectionString + "/";
             }
+
+            if (!connectionString.startsWith("https://")
+            && !connectionString.startsWith("http://")) {
+                connectionString = "http://" + connectionString;
+            }
+
             HttpRequest.Builder builder = HttpRequest.newBuilder()
                     .uri(URI.create(connectionString + endpointName))
                     .header("Content-Type", "application/json");
@@ -83,7 +89,7 @@ public class WebServiceCaller {
             {
                 //log.error("Unexpected error when calling {}", connectionString + endpointName, e);
             }
-            ErrorHandling.logEvent("Error",true,e);
+            ErrorHandling.logEvent("Error webservicecaller.callServerMethodThrows",true,e);
             //throw new RuntimeException(e);
             return null;
         }

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,11 +25,12 @@ import java.util.List;
  *
  * <p>Each method serves either an API endpoint (returning JSON) or a form-based interface (returning a view name).
  */
-@Controller("/client")
+@Controller("/hdls-client")
 public class ClientEndpoints {
 
     @Autowired
     private ClientEngine clientEngine;
+
 
     /**
      * Displays client metadata (e.g., public key, last known hash).
@@ -36,7 +38,7 @@ public class ClientEndpoints {
      * @param model Spring Model to populate with attributes
      * @return view name for client page
      */
-    @GetMapping("/client")
+    @GetMapping("/hdls-client")
     public String client(Model model) {
         String publicKey = "PUBLIC_KEY";
         String endpoint = "LAST_HASH";
@@ -53,6 +55,29 @@ public class ClientEndpoints {
         return "client"; // Corresponds to home.html
     }
 
+
+    /**
+     * Generates a new public/private key pair for creating additional accounts.
+     * The keys are returned in Base64 encoded format as JSON.
+     *
+     * @return String JSON response containing both privateKeyBase64 and publicKeyBase64
+     */
+    @GetMapping("/hdls-client/newKeyPair")
+    public String generateKeyPair(Model model)
+    {
+        KeyPair keyPair = Encryption.createNewKey();
+        model.addAttribute("apiEndpoint","");
+        model.addAttribute("title","generate Key Pair");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Your key pair");
+        model.addAttribute("jsonDefault",
+                "{\n\"privateKey\":\n\"" + Encryption.ByteArrayToBase64(keyPair.getPrivate().getEncoded())
+                        + "\",\n\"publicKey\":\n\"" + Encryption.ByteArrayToBase64(keyPair.getPublic().getEncoded() ) + "\"\n}");
+
+        return "JSONInput";
+
+    }
+
     /**
      * Initializes an integrated encryption entity, verifying its signature before setting.
      *
@@ -60,7 +85,7 @@ public class ClientEndpoints {
      * @return status string
      */
     @ResponseBody
-    @PostMapping("/client/setEncryptionEntityIntegrated")
+    @PostMapping("/hdls-client/setEncryptionEntityIntegrated")
     public String setEncryptionEntityIntegrated(@RequestBody EncryptionEntity_Integrated jsonInput) {
         String testMessage = "the quick brown fox jumps over the lazy dog";
         if(clientEngine.getEncryptionEntity() != null) {
@@ -78,9 +103,9 @@ public class ClientEndpoints {
     /**
      * Displays form for setting an integrated encryption entity.
      */
-    @GetMapping("/client/setEncryptionEntityIntegrated")
+    @GetMapping("/hdls-client/setEncryptionEntityIntegrated")
     public String clientSetEncryptionEntityIntegrated(Model model) {
-        model.addAttribute("apiEndpoint","/client/setEncryptionEntityIntegrated");
+        model.addAttribute("apiEndpoint","/hdls-client/setEncryptionEntityIntegrated");
         model.addAttribute("title","Set Encryption Entity (Integrated)");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -97,7 +122,7 @@ public class ClientEndpoints {
      * Initializes an external encryption entity, verifying its signature before setting.
      */
     @ResponseBody
-    @PostMapping("/client/setEncryptionEntityExternalServer")
+    @PostMapping("/hdls-client/setEncryptionEntityExternalServer")
     public String setEncryptionEntityExternalServer(@RequestBody EncryptionEntity_ExternalServer jsonInput) {
         String testMessage = "the quick brown fox jumps over the lazy dog";
         if(clientEngine.getEncryptionEntity() != null) {
@@ -115,9 +140,9 @@ public class ClientEndpoints {
     /**
      * Displays form for setting an external encryption entity.
      */
-    @GetMapping("/client/setEncryptionEntityExternalServer")
+    @GetMapping("/hdls-client/setEncryptionEntityExternalServer")
     public String setEncryptionEntityExternalServer(Model model) {
-        model.addAttribute("apiEndpoint","/client/setEncryptionEntityExternalServer");
+        model.addAttribute("apiEndpoint","/hdls-client/setEncryptionEntityExternalServer");
         model.addAttribute("title","Set Encryption Entity (Integrated)");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste connection string here:");
@@ -129,7 +154,7 @@ public class ClientEndpoints {
      * Sets or updates the validator endpoint.
      */
     @ResponseBody
-    @PostMapping("/client/setEndpoint")
+    @PostMapping("/hdls-client/setEndpoint")
     public String setEndpointPost(@RequestBody String endpoint) {
         if (endpoint.equals(this.clientEngine.getEndpoint()))
         {
@@ -142,9 +167,9 @@ public class ClientEndpoints {
     /**
      * Displays form for setting the server endpoint.
      */
-    @GetMapping("/client/setEndpoint")
+    @GetMapping("/hdls-client/setEndpoint")
     public String clientVoteDelegation(Model model) {
-        model.addAttribute("apiEndpoint","/client/setEndpoint");
+        model.addAttribute("apiEndpoint","/hdls-client/setEndpoint");
         model.addAttribute("title","Set Server endpoint");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste validator connection string here:");
@@ -156,7 +181,7 @@ public class ClientEndpoints {
      * Signs an offline payment object using the local encryption key.
      */
     @ResponseBody
-    @PostMapping("/client/clientNotifySpendOffline")
+    @PostMapping("/hdls-client/clientNotifySpendOffline")
     public ExternalPayment clientNotifySpendOffline(@RequestBody ExternalPayment json) {
         json.signPayment(clientEngine.getEncryptionEntity());
         return json;
@@ -165,9 +190,9 @@ public class ClientEndpoints {
     /**
      * Displays form for generating and signing offline payments.
      */
-    @GetMapping("/client/clientNotifySpendOffline")
+    @GetMapping("/hdls-client/clientNotifySpendOffline")
     public String clientAuthorizePaymentGet(Model model) {
-        model.addAttribute("apiEndpoint","/client/clientNotifySpend");
+        model.addAttribute("apiEndpoint","/hdls-client/clientNotifySpend");
         model.addAttribute("title","Generate spend messages");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -186,7 +211,7 @@ public class ClientEndpoints {
      * Creates and sends a payment transaction using the current encryption entity.
      */
     @ResponseBody
-    @PostMapping("/client/clientPay")
+    @PostMapping("/hdls-client/clientPay")
     public List<ExternalPayment> clientPay(@RequestBody ExternalPayment json)
     {
         List<ExternalPayment> list = new ArrayList<>();
@@ -205,9 +230,9 @@ public class ClientEndpoints {
     /**
      * Displays form for submitting payment requests.
      */
-    @GetMapping("/client/clientPay")
+    @GetMapping("/hdls-client/clientPay")
     public String clientPayGet(Model model) {
-        model.addAttribute("apiEndpoint","/client/clientPay");
+        model.addAttribute("apiEndpoint","/hdls-client/clientPay");
         model.addAttribute("title","Make a payment");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -224,7 +249,7 @@ public class ClientEndpoints {
      * Signs a voting delegation message offline.
      */
     @ResponseBody
-    @PostMapping("/client/clientUpdateAccountAttributesOffline")
+    @PostMapping("/hdls-client/clientUpdateAccountAttributesOffline")
     public AccountAttributesUpdate clientUpdateAccountAttributesOfflineGet(@RequestBody AccountAttributesUpdate json) {
         json.setSignatureValue(clientEngine.getEncryptionEntity().signMessage(json.getStringToSign()));
         return json;
@@ -233,9 +258,9 @@ public class ClientEndpoints {
     /**
      * Displays form for offline vote delegation signing.
      */
-    @GetMapping("/client/clientUpdateAccountAttributesOffline")
+    @GetMapping("/hdls-client/clientUpdateAccountAttributesOffline")
     public String clientVoteDelegationOfflinePost(Model model) {
-        model.addAttribute("apiEndpoint","/client/clientVoteDelegationOffline");
+        model.addAttribute("apiEndpoint","/hdls-client/clientVoteDelegationOffline");
         model.addAttribute("title","update Account Attributes");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -254,7 +279,7 @@ public class ClientEndpoints {
      * Delegates voting to another public key server-side.
      */
     @ResponseBody
-    @PostMapping("/client/clientUpdateAccountAttributes")
+    @PostMapping("/hdls-client/clientUpdateAccountAttributes")
     public String clientUpdateAccountAttributes(@RequestBody AccountAttributesUpdate json)
     {
         String ret;
@@ -276,9 +301,9 @@ public class ClientEndpoints {
     /**
      * Displays form for server-side vote delegation.
      */
-    @GetMapping("/client/clientUpdateAccountAttributes")
+    @GetMapping("/hdls-client/clientUpdateAccountAttributes")
     public String clientUpdateAccountAttributesPost(Model model) {
-        model.addAttribute("apiEndpoint","/client/clientUpdateAccountAttributes");
+        model.addAttribute("apiEndpoint","/hdls-client/clientUpdateAccountAttributes");
         model.addAttribute("title","Update account attributes");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -294,7 +319,7 @@ public class ClientEndpoints {
      * Retrieves the total balance for the given account public key.
      */
     @ResponseBody
-    @PostMapping("/client/AccountTotals")
+    @PostMapping("/hdls-client/AccountTotals")
     public String AccountTotal(@RequestBody String publicKey) {
         return clientEngine.getAccountTotal(publicKey);
     }
@@ -302,12 +327,54 @@ public class ClientEndpoints {
     /**
      * Displays form to fetch account totals.
      */
-    @GetMapping("/client/getAccountTotals")
+    @GetMapping("/hdls-client/getAccountTotals")
     public String AccountTotalGet(Model model) {
-        model.addAttribute("apiEndpoint","/client/AccountTotals");
+        model.addAttribute("apiEndpoint","/hdls-client/AccountTotals");
         model.addAttribute("title","Account Totals");
         model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Paste public key here:");
+        model.addAttribute("jsonLabel","Paste name or public key here:");
+        model.addAttribute("jsonDefault","");
+        return "JSONInput";
+    }
+
+    /**
+     * Retrieves the total balance for the given account public key.
+     */
+    @ResponseBody
+    @PostMapping("/hdls-client/getIPAddress")
+    public String getIPAddress(@RequestBody String publicKey) { return clientEngine.getIPAddress(publicKey); }
+
+    /**
+     * Displays form to fetch account totals.
+     */
+    @GetMapping("/hdls-client/getIPAddress")
+    public String getIPAddress(Model model) {
+        model.addAttribute("apiEndpoint","/hdls-client/getIPAddress");
+        model.addAttribute("title","get IP Address");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste name or public key here:");
+        model.addAttribute("jsonDefault","");
+        return "JSONInput";
+    }
+
+    /**
+     * Retrieves the total balance for the given account public key.
+     */
+    @ResponseBody
+    @PostMapping("/hdls-client/getAccountInfo")
+    public String getAccountInfo(@RequestBody String publicKey) {
+        return clientEngine.getAccountInfo(publicKey);
+    }
+
+    /**
+     * Displays form to fetch account totals.
+     */
+    @GetMapping("/hdls-client/getAccountInfo")
+    public String getAccountInfo(Model model) {
+        model.addAttribute("apiEndpoint","/hdls-client/getAccountInfo");
+        model.addAttribute("title","get Account info");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste name or public key here:");
         model.addAttribute("jsonDefault","");
         return "JSONInput";
     }

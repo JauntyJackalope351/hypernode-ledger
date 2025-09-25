@@ -61,23 +61,28 @@ public class Signature
             return "";
         }
         return  messages.stream()//.filter(Signature::validate)
-                        .sorted(Comparator.comparing(Signature::uniqueString))
+                        //.sorted(Comparator.comparing(Signature::uniqueString))
                         .map(Signature::uniqueString)
+                        .sorted()
                         .collect(Collectors.joining("|")
         );
     }
     public String uniqueString() {
-        return Encryption.hash(this.getPublicKey()) + ";" + this.getMessageValue() +";" + Encryption.hash(this.getSignatureValue()) + ";";
+        return this.getSignatureValue() + ";" + this.getPublicKey()  ;
     }
 
     public static Set<Signature> publicKeyToName(Set<Signature> signatures, Set<DistributedLedgerAccount> accounts) {
-        Map<String, String> map = accounts.stream().filter(a -> (a.getName() != null && !a.getName().isEmpty()))
+        Map<String, String> map = accounts.stream()
+                .filter(a -> (a.getName() != null && !a.getName().isEmpty()))
                 .collect(Collectors.toMap(DistributedLedgerAccount::getPublicKey, DistributedLedgerAccount::getName));
-        return signatures.stream().map(p -> Signature.create(map.getOrDefault(p.getPublicKey(),p.getPublicKey()),p.messageValue,p.signatureValue)).collect(Collectors.toSet());
+        return signatures.stream()
+                .map(p -> Signature.create(map.getOrDefault(p.getPublicKey(),p.getPublicKey()),p.messageValue,p.signatureValue))
+                .collect(Collectors.toSet());
     }
 
     public static Signature publicKeyToName(Signature s, Set<DistributedLedgerAccount> accounts)
     {
+
         String name = accounts.stream()
                 .filter(a -> s.getPublicKey().equals(a.getPublicKey()) && a.getName() != null && !a.getName().isEmpty())
                 .map(DistributedLedgerAccount::getName).findFirst().orElse(s.getPublicKey());
@@ -87,20 +92,24 @@ public class Signature
 
     public static Set<Signature> nameToPublicKey(Set<Signature> signatures, Set<DistributedLedgerAccount> accounts)
     {
-        Map<String, String> map = accounts.stream().filter(a -> (a.getName() != null && !a.getName().isEmpty()))
+        Map<String, String> map = accounts.stream()
+                .filter(a -> (a.getName() != null && !a.getName().isEmpty()))
                 .collect(Collectors.toMap(DistributedLedgerAccount::getName, DistributedLedgerAccount::getPublicKey));
-        return signatures.stream().filter(
-                        p -> map.containsKey(p.getPublicKey())
-                ).map(p -> Signature.create(map.getOrDefault(p.getPublicKey(),p.getPublicKey()),p.messageValue,p.signatureValue)).collect(Collectors.toSet());
+        return signatures.stream()
+                //.filter(p -> map.containsKey(p.getPublicKey()) )
+                .map(p -> Signature.create(map.getOrDefault(p.getPublicKey(),p.getPublicKey()),p.messageValue,p.signatureValue))
+                .collect(Collectors.toSet());
     }
 
     public static Signature nameToPublicKey(Signature s, Set<DistributedLedgerAccount> accounts)
     {
+
         String name = accounts.stream()
                 .filter(a -> s.getPublicKey().equals(a.getName())).map(DistributedLedgerAccount::getPublicKey)
                 .findFirst().orElse(s.getPublicKey());
 
         return Signature.create(name,s.messageValue,s.signatureValue);
+
     }
 
 

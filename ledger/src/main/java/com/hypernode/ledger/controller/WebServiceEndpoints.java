@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
-import java.security.KeyPair;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -33,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  * Provides HTTP endpoints for ledger operations, account management, authentication,
  * and validator node interactions in a distributed blockchain system.
  */
-@Controller("/")
+@Controller("/hdls")
 public class WebServiceEndpoints
 {
     @Autowired
@@ -48,15 +47,285 @@ public class WebServiceEndpoints
      * @param model Spring MVC model for passing data to the view
      * @return String view name "home" which corresponds to home.html template
      */
-    @GetMapping("/")
+    @GetMapping("/hdls")
     public String home(Model model) {
         return "home"; // Corresponds to home.html
     }
 
     @ResponseBody
-    @GetMapping("/version")
+    @GetMapping("/hdls/version")
     public String getVersion() {
-        return "1.0.0.4";
+        return "2025.9.14.1";
+    }
+
+
+    /**
+     * Completes the initialization process for a new node joining the network.
+     * This is called asynchronously after successful authentication to provide
+     * the latest validated data contract to the newly joined node.
+     *
+     * @param _lastDataContract StatusDataContract containing the most recent
+     *                         validated state of the distributed ledger
+     */
+    @ResponseBody
+    @PostMapping("/hdls/initialize")
+    public boolean initialize(@RequestBody StatusDataContract _lastDataContract) {
+        WebServiceInitializer.initialize(webServiceEngine, _lastDataContract);
+        //this.webServiceEngine.TimedReadingEvent();
+        this.startTimer();
+        return true;
+    }
+
+    /**
+     * Provides a challenge string that must be digitally signed for authentication.
+     * This string is used in the two-phase authentication process where clients
+     * must prove ownership of their private key by signing this challenge.
+     *
+     * @return String challenge text that must be signed with the client's private key
+     */
+    @ResponseBody
+    @GetMapping("/hdls/requestAuthenticationStringToSign")
+    public String requestAuthenticationStringToSign() {
+        return webServiceEngine.requestAuthenticationStringToSign();
+    }
+
+    /**
+     * Record class for server authentication requests.
+     * Contains all necessary information for validating a server's identity and connection.
+     *
+     * @param publicKey String Base64 encoded public key of the requesting server
+     * @param signedMessage String Base64 encoded signature of the challenge string
+     * @param connectionString String connection details for reaching the requesting server
+     * @param signedConnectionString String Base64 encoded signature of the connection string
+     */
+    public record AuthenticateServerRequest(String publicKey, String signedMessage, String connectionString, String signedConnectionString){
+    }
+
+    /**
+     * Authenticates a server attempting to join the network.
+     * Verifies that the requesting server owns the private key corresponding
+     * to their claimed public key by validating their digital signature.
+     *
+     * @param request AuthenticateServerRequest containing the public key, signed challenge,
+     *               connection string, and signed connection string for verification
+     * @return boolean true if authentication succeeds and server is accepted into network,
+     *         false if authentication fails
+     */
+    @ResponseBody
+    @PostMapping("/hdls/authenticateServer")
+    public boolean authenticateServerWrapper(@RequestBody AuthenticateServerRequest request) {
+        return webServiceEngine.authenticateServer(request.publicKey, request.signedMessage, request.connectionString, request.signedConnectionString );
+    }
+
+    /**
+     * Retrieves the current transport message being transmitted across the network.
+     * This endpoint provides access to the latest block data and can be used
+     * for network synchronization and as a cached response in CDN deployments.
+     *
+     * @return TransportMessageDataContract containing the current block data
+     *         and transaction information being propagated through the network
+     */
+    @ResponseBody
+    @GetMapping("/hdls/getCurrentlyTransmittedTransportMessage")
+    public TransportMessageDataContract getCurrentlyTransmittedTransportMessage()
+    {
+        return webServiceEngine.getCurrentlyTransmittedTransportMessage();
+    }
+
+
+    /**
+     * Retrieves the current status of the distributed ledger system.
+     * Provides comprehensive information about accounts, balances, validator nodes,
+     * and system parameters. Useful for monitoring and debugging the ledger state.
+     *
+     * @return StatusDataContract containing complete system status including
+     *         account balances, validator information, and current parameters
+     */
+    @ResponseBody
+    @GetMapping("/hdls/getStatus")
+    public StatusDataContract getStatus()
+    {
+        StatusDataContract ret;
+        ret = webServiceEngine.getStatusDataContract();
+        return ret;
+        //return webServiceEngine.getStatusDataContract();
+    }
+
+    /**
+     * Retrieves the public key that is used in this node.
+     *
+     * @return the public key, in string form
+     */
+    @ResponseBody
+    @GetMapping("/hdls/getPublicKey")
+    public String getPublicKey()
+    {
+        return this.webServiceEngine.getEncryptionEntity().getPublicKey();
+    }
+
+
+    /**
+     * Retrieves account information for a specific public key.
+     * Returns the account details including balance and validator assignment.
+     *
+     * @param _publicKey String public key of the account to query
+     * @return DistributedLedgerAccount containing account details and current balance,
+     *         or null if the account is not found
+     */
+    @ResponseBody
+    @PostMapping("/hdls/AccountTotals")
+    public DistributedLedgerAccount AccountTotal(@RequestBody String _publicKey) {
+        return DistributedLedgerAccount.find(webServiceEngine.getStatusDataContract().getAccountsList(), _publicKey.replace("\"",""));
+    }
+
+    /**
+     * Submits a list of payment transactions to be included in the next block.
+     * Validates and queues the transactions for processing by the network consensus.
+     * Each payment must be properly signed by the sender's private key.
+     *
+     * @param _requestedPayments List of ExternalPayment objects containing transaction details
+     *                          including sender, recipient, amount, and digital signature
+     * @return List<ExternalPayment> processed payments with validation results
+     *         and transaction IDs assigned by the system
+     */
+    @ResponseBody
+    @PostMapping("/hdls/spend")
+    public List<ExternalPayment> spendList(@RequestBody List<ExternalPayment> _requestedPayments) {
+        return webServiceEngine.notifySpend(_requestedPayments);
+    }
+
+
+
+    /**
+     * Submits a voting delegation change to the network.
+     * Allows account holders to delegate their voting rights to validator nodes
+     * for parameter changes and network governance decisions.
+     *
+     * @param _accountAttributesUpdate VotingDelegation object containing the delegation details
+     *                         including delegator, delegate, and digital signature
+     */
+    @ResponseBody
+    @PostMapping("/hdls/updateAccountAttributes")
+    public String updateAccountAttributes(@RequestBody AccountAttributesUpdate _accountAttributesUpdate) {
+        return  webServiceEngine.notifyupdateAccountAttributes(_accountAttributesUpdate);
+    }
+
+    /**
+     * Manually processes a transport message data contract.
+     * This endpoint allows for manual injection of transport messages,
+     * typically used for testing or recovery scenarios.
+     *
+     * @param transportMessageDataContract TransportMessageDataContract containing
+     *                                   the message data to be processed by the system
+     */
+    @ResponseBody
+    @PostMapping("/hdls/processTransportMessageDataContract")
+    public void manualProcessTransportMessageDataContract(@RequestBody TransportMessageDataContract transportMessageDataContract) {
+        webServiceEngine.receiveData(transportMessageDataContract);
+    }
+
+    /**
+     * Retrieves the available balance for a specific account.
+     * Returns the current spendable amount for the given public key.
+     *
+     * @param publicKey String public key of the account to query
+     * @return BigDecimal representing the available balance for the specified account
+     */
+    @ResponseBody
+    @GetMapping("/hdls/getAmount")
+    public BigDecimal getAmount(String publicKey) {
+        return webServiceEngine.getAmountAvailable(publicKey);
+    }
+
+    /**
+     * Retrieves the current block ID being processed by the system.
+     * Useful for synchronization and determining the current state of the ledger.
+     *
+     * @return int current block ID that is being transmitted across the network
+     */
+    @ResponseBody
+    @GetMapping("/hdls/getBlockId")
+    public int getBlockId()
+    {
+        return this.webServiceEngine.getBlockId();
+    }
+
+    @ResponseBody
+    @GetMapping("/hdls/getLedgerHistory")
+    public LedgerHistory getLedgerHistory()
+    {
+        return this.webServiceEngine.getLedgerHistory();
+    }
+    @ResponseBody
+    @GetMapping("/hdls/getLedgerHistoryInterval")
+    public LedgerHistory getLedgerHistoryInterval(int start, int end)
+    {
+        return this.webServiceEngine.getLedgerHistory().getInterval(start,end);
+    }
+
+    @ResponseBody
+    @GetMapping("/hdls/setNewLedgerHistoryOrigin")
+    public String setNewLedgerOrigin( @RequestBody int id)
+    {
+        this.webServiceEngine.getLedgerHistory().changeOriginalContract(id);
+        return "OK";
+    }
+
+    @ResponseBody
+    @PostMapping("/hdls/getAccountInfo")
+    public AccountInfo getAccountInfo(@RequestBody String  id)
+    {
+        AccountInfo ret;
+
+        ret = this.webServiceEngine.getAccountInfo(id.replace("\"",""));
+        return ret;
+    }
+
+    @ResponseBody
+    @PostMapping("/hdls/getIPAddress")
+    public String getIPAddress(@RequestBody String id)
+    {
+        AccountInfo ret;
+        ret = this.webServiceEngine.getAccountInfo(id.replace("\"",""));
+        return ret.getNode().ipAddress();
+    }
+
+    public void startTimer() {
+
+        //this.webServiceEngine.startTimer();
+        ErrorHandling.logEvent("startTimer",false,null);
+        //starting from the hour to soft align the timescales
+        final long epochNow = Instant.now().toEpochMilli();
+        final long epochHourInMilli = epochNow - Math.floorMod(Instant.now().toEpochMilli(), 1000 * 60 * 60);
+        final long schedulerMargin = webServiceEngine.getStatusDataContract().getLedgerParameters().getFrameProcessingTimeMilliseconds();
+        final long timePerFrame =  Math.divideExact( 1000*60*60 ,Math.max(webServiceEngine.getStatusDataContract().getLedgerParameters().getMessageUpdateFrequencyPerHour(),1));
+        int counter;
+        //find the time of the start of the next blockTempVersion that happens in the future
+        counter = (int) ((epochNow - epochHourInMilli + schedulerMargin) / timePerFrame);
+        counter++;
+        //and then get the time interval so that it starts on time
+        long interval = (epochHourInMilli + (counter * timePerFrame)) - epochNow;
+        long interval2 = interval + schedulerMargin;
+        try
+        {
+            scheduler.schedule(this::TimedUpdatingEvent, interval, TimeUnit.MILLISECONDS);
+            scheduler.schedule(this::TimedReadingEvent, interval2, TimeUnit.MILLISECONDS);
+            scheduler.schedule(this::startTimer,interval2 + 1000,TimeUnit.MILLISECONDS);
+        }
+        catch (Exception e)
+        {
+            ErrorHandling.logEvent("error WebServiceEndpoint.startTimer",true,e);
+            //throw new RuntimeException("fail");
+        }
+
+    }
+    public void TimedUpdatingEvent()
+    {
+        this.webServiceEngine.TimedUpdatingEvent();
+    }
+    public void TimedReadingEvent()
+    {
+        this.webServiceEngine.TimedReadingEvent();
     }
 
     /**
@@ -66,7 +335,7 @@ public class WebServiceEndpoints
      * @param model Spring MVC model for passing server status data to the view
      * @return String view name "server" which corresponds to server.html template
      */
-    @GetMapping("/server")
+    @GetMapping("/hdls-server-admin")
     public String server(Model model) {
         String publicKey = "PUBLIC_KEY";
         String lastHash = "LAST_HASH";
@@ -83,27 +352,6 @@ public class WebServiceEndpoints
         return "server"; // Corresponds to home.html
     }
 
-    /**
-     * Generates a new public/private key pair for creating additional accounts.
-     * The keys are returned in Base64 encoded format as JSON.
-     *
-     * @return String JSON response containing both privateKeyBase64 and publicKeyBase64
-     */
-    @GetMapping("/newKeyPair")
-    public String generateKeyPair(Model model)
-    {
-        KeyPair keyPair = Encryption.createNewKey();
-        model.addAttribute("apiEndpoint","");
-        model.addAttribute("title","generate Key Pair");
-        model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Your key pair");
-        model.addAttribute("jsonDefault",
-                "{\n\"privateKey\":\n\"" + Encryption.ByteArrayToBase64(keyPair.getPrivate().getEncoded())
-                        + "\",\n\"publicKey\":\n\"" + Encryption.ByteArrayToBase64(keyPair.getPublic().getEncoded() ) + "\"\n}");
-
-        return "JSONInput";
-
-    }
 
     /**
      * Sets the encryption entity for integrated key management.
@@ -115,9 +363,9 @@ public class WebServiceEndpoints
      *         or "Invalid Keys" if the key validation fails
      */
     @ResponseBody
-    @PostMapping("/setEncryptionEntityIntegrated")
+    @PostMapping("/hdls-server-admin/setEncryptionEntityIntegrated")
     public String setEncryptionEntityIntegrated(@RequestBody EncryptionEntity_Integrated jsonInput) {
-        String testMessage = "the quick brown fox jumps over the lazy dog";
+        String testMessage = "the quick brown fox jumps over the lazy dog"; //TODO use a randomized string, even the previous hash would be fine
         if(webServiceEngine.getEncryptionEntity() != null) {
             return "Already Started";
         }
@@ -130,28 +378,6 @@ public class WebServiceEndpoints
     }
 
     /**
-     * Displays the form page for setting up integrated encryption entity.
-     * Provides a user interface for inputting public and private keys.
-     *
-     * @param model Spring MVC model for passing form configuration to the view
-     * @return String view name "JSONInput" for the key input form
-     */
-    @GetMapping("/server/setEncryptionEntityIntegrated")
-    public String clientSetEncryptionEntityIntegrated(Model model) {
-        model.addAttribute("apiEndpoint","/setEncryptionEntityIntegrated");
-        model.addAttribute("title","Set Encryption Entity (Integrated)");
-        model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Paste JSON here:");
-        model.addAttribute("jsonDefault","{\n" +
-                "\"publicKey\":\n" +
-                "\"PUBLIC_KEY\",\n" +
-                "\"privateKey\":\n" +
-                "\"PRIVATE_KEY\"\n" +
-                "}");
-        return "JSONInput";
-    }
-
-    /**
      * Sets the encryption entity for external server key management.
      * Configures the server to use an external signing service for cryptographic operations.
      * Validates the connection by testing message signing before acceptance.
@@ -161,7 +387,7 @@ public class WebServiceEndpoints
      *         or "Invalid Keys" if the external server validation fails
      */
     @ResponseBody
-    @PostMapping("/setEncryptionEntityExternalServer")
+    @PostMapping("/hdls-server-admin/setEncryptionEntityExternalServer")
     public String setEncryptionEntityExternalServer(@RequestBody EncryptionEntity_ExternalServer jsonInput) {
         String testMessage = "the quick brown fox jumps over the lazy dog";
         if(webServiceEngine.getEncryptionEntity() != null) {
@@ -175,22 +401,6 @@ public class WebServiceEndpoints
         return "OK";
     }
 
-    /**
-     * Displays the form page for setting up external server encryption entity.
-     * Provides a user interface for inputting external server connection details.
-     *
-     * @param model Spring MVC model for passing form configuration to the view
-     * @return String view name "JSONInput" for the external server connection form
-     */
-    @GetMapping("/server/setEncryptionEntityExternalServer")
-    public String setEncryptionEntityExternalServer(Model model) {
-        model.addAttribute("apiEndpoint","/setEncryptionEntityExternalServer");
-        model.addAttribute("title","Set Encryption Entity (Integrated)");
-        model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Paste connection string here:");
-        model.addAttribute("jsonDefault", "");
-        return "JSONInput";
-    }
 
     /**
      * Initializes and creates a new distributed ledger with the provided configuration.
@@ -203,7 +413,7 @@ public class WebServiceEndpoints
      *         or "Set Encryption entity first" if no encryption entity is configured
      */
     @ResponseBody
-    @PostMapping("/initCreateNewLedger")
+    @PostMapping("/hdls-server-admin/initCreateNewLedger")
     public String initCreateNewLedger(@RequestBody StatusDataContract startingData) {
         ValidatorNode validatorNode;
         if(webServiceEngine.getStatusDataContract() != null)
@@ -237,6 +447,94 @@ public class WebServiceEndpoints
         return "OK";
     }
 
+
+    /**
+     * Record class for join existing ledger requests.
+     * Contains the connection strings needed for a node to join an existing network.
+     *
+     * @param thisConnectionString String connection string for this node
+     * @param connectionStringDestination String connection string of the target node to connect to
+     */
+    public record joinExistingLedgerRequest(String thisConnectionString, String connectionStringDestination){
+    }
+
+    /**
+     * Joins an existing distributed ledger network by connecting to a known validator node.
+     * Initiates the authentication and synchronization process with the existing network.
+     *
+     * @param _request joinExistingLedgerRequest containing this node's connection string
+     *                and the destination node's connection string for initial contact
+     * @return String status message indicating success or failure of the join operation
+     */
+    @ResponseBody
+    @PostMapping("/hdls-server-admin/joinExistingLedger")
+    public String joinExistingLedger(@RequestBody joinExistingLedgerRequest _request) {
+        String ret;
+        if(webServiceEngine.getStatusDataContract() != null)
+        {
+            return "Already Started";
+        }
+        return WebServiceInitializer.joinExistingLedger(webServiceEngine, _request.connectionStringDestination, _request.thisConnectionString);
+    }
+
+
+
+
+    /**
+     * Submits a vote for changing ledger parameters.
+     * Allows validator nodes to propose modifications to system parameters
+     * such as transaction costs, block timing, and validation requirements.
+     *
+     * @param _LedgerParameters LedgerParameters object containing the proposed
+     *                         parameter changes to be voted on by the network
+     */
+    @ResponseBody
+    @PostMapping("/hdls-server-admin/changeVotedParameters")
+    public void changeVotedParameters(@RequestBody LedgerParameters _LedgerParameters)//, String signatureBase64)
+    {
+        //if(Encryption.verifySignedMessage(_LedgerParameters.getStringToSign(), webServiceEngine.getEncryptionEntity().getPublicKey(),Encryption.base64ToByteArray(signatureBase64)))
+        //{
+        webServiceEngine.getPendingNextMessage().setVotedParameterChanges(_LedgerParameters);
+        //}
+    }
+
+    /**
+     * Displays the form page for setting up integrated encryption entity.
+     * Provides a user interface for inputting public and private keys.
+     *
+     * @param model Spring MVC model for passing form configuration to the view
+     * @return String view name "JSONInput" for the key input form
+     */
+    @GetMapping("/hdls-server-admin/setEncryptionEntityIntegrated")
+    public String clientSetEncryptionEntityIntegrated(Model model) {
+        model.addAttribute("apiEndpoint","/hdls-server-admin/setEncryptionEntityIntegrated");
+        model.addAttribute("title","Set Encryption Entity (Integrated)");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste JSON here:");
+        model.addAttribute("jsonDefault","{\n" +
+                "\"publicKey\":\n" +
+                "\"PUBLIC_KEY\",\n" +
+                "\"privateKey\":\n" +
+                "\"PRIVATE_KEY\"\n" +
+                "}");
+        return "JSONInput";
+    }
+    /**
+     * Displays the form page for setting up external server encryption entity.
+     * Provides a user interface for inputting external server connection details.
+     *
+     * @param model Spring MVC model for passing form configuration to the view
+     * @return String view name "JSONInput" for the external server connection form
+     */
+    @GetMapping("/hdls-server-admin/setEncryptionEntityExternalServer")
+    public String setEncryptionEntityExternalServer(Model model) {
+        model.addAttribute("apiEndpoint","/hdls-server-admin/setEncryptionEntityExternalServer");
+        model.addAttribute("title","Set Encryption Entity (Integrated)");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste connection string here:");
+        model.addAttribute("jsonDefault", "");
+        return "JSONInput";
+    }
     /**
      * Displays the form page for creating a new ledger.
      * Pre-populates the form with default configuration including the current server's public key.
@@ -244,14 +542,14 @@ public class WebServiceEndpoints
      * @param model Spring MVC model for passing form configuration to the view
      * @return String view name "JSONInput" for the new ledger creation form
      */
-    @GetMapping("/server/createNewLedger")
+    @GetMapping("/hdls-server-admin/createNewLedger")
     public String initCreateNewLedgerGet(Model model) {
         String publicKey = "PUBLIC_KEY";
         if(this.webServiceEngine.getEncryptionEntity() != null)
         {
             publicKey = this.webServiceEngine.getEncryptionEntity().getPublicKey();
         }
-        model.addAttribute("apiEndpoint","/initCreateNewLedger");
+        model.addAttribute("apiEndpoint","/hdls-server-admin/initCreateNewLedger");
         model.addAttribute("title","Create new Ledger");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -282,45 +580,15 @@ public class WebServiceEndpoints
     }
 
     /**
-     * Record class for join existing ledger requests.
-     * Contains the connection strings needed for a node to join an existing network.
-     *
-     * @param thisConnectionString String connection string for this node
-     * @param connectionStringDestination String connection string of the target node to connect to
-     */
-    public record joinExistingLedgerRequest(String thisConnectionString, String connectionStringDestination){
-    }
-
-    /**
-     * Joins an existing distributed ledger network by connecting to a known validator node.
-     * Initiates the authentication and synchronization process with the existing network.
-     *
-     * @param _request joinExistingLedgerRequest containing this node's connection string
-     *                and the destination node's connection string for initial contact
-     * @return String status message indicating success or failure of the join operation
-     */
-    @ResponseBody
-    @PostMapping("/joinExistingLedger")
-    public String joinExistingLedger(@RequestBody joinExistingLedgerRequest _request) {
-        String ret;
-        if(webServiceEngine.getStatusDataContract() != null)
-        {
-            return "Already Started";
-        }
-        return WebServiceInitializer.joinExistingLedger(webServiceEngine, _request.connectionStringDestination, _request.thisConnectionString);
-
-    }
-
-    /**
      * Displays the form page for joining an existing ledger.
      * Provides interface for specifying connection strings for network joining.
      *
      * @param model Spring MVC model for passing form configuration to the view
      * @return String view name "JSONInput" for the join ledger form
      */
-    @GetMapping("/server/joinExistingLedger")
+    @GetMapping("/hdls-server-admin/joinExistingLedger")
     public String joinExistingLedgerGet(Model model) {
-        model.addAttribute("apiEndpoint","/joinExistingLedger");
+        model.addAttribute("apiEndpoint","/hdls-server-admin/joinExistingLedger");
         model.addAttribute("title","Join existing Ledger");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -330,95 +598,59 @@ public class WebServiceEndpoints
                 "}");
         return "JSONInput";
     }
-
     /**
-     * Completes the initialization process for a new node joining the network.
-     * This is called asynchronously after successful authentication to provide
-     * the latest validated data contract to the newly joined node.
+     * Displays the form page for submitting payment transactions.
+     * Provides interface for creating and submitting spend transactions to the network.
      *
-     * @param _lastDataContract StatusDataContract containing the most recent
-     *                         validated state of the distributed ledger
+     * @param model Spring MVC model for passing form configuration to the view
+     * @return String view name "JSONInput" for the payment submission form
      */
-    @ResponseBody
-    @PostMapping("/initialize")
-    public boolean initialize(@RequestBody StatusDataContract _lastDataContract) {
-        WebServiceInitializer.initialize(webServiceEngine, _lastDataContract);
-        this.startTimer();
-        return true;
+    @GetMapping("/hdls-server-admin/spend")
+    public String spendListGet(Model model) {
+        model.addAttribute("apiEndpoint","/hdls/spend");
+        model.addAttribute("title","Receive spend messages");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste JSON here:");
+        model.addAttribute("jsonDefault", "[\n" +
+                "{\n" +
+                "\"publicKeyFrom\":\"PUBLIC_KEY_FROM\",\n" +
+                "\"publicKeyTo\":\"PUBLIC_KEY_TO\",\n" +
+                "\"paymentComment\":\"COMMENT\",\n" +
+                "\"amount\": \"1.00\",\n" +
+                "\"blockId\": 2\n" +
+                "},\n" +
+                "{\n" +
+                "\"publicKeyFrom\":\"PUBLIC_KEY_FROM\",\n" +
+                "\"publicKeyTo\":\"PUBLIC_KEY_TO\",\n" +
+                "\"paymentComment\":\"COMMENT\",\n" +
+                "\"amount\": \"1.00\",\n" +
+                "\"blockId\": 2\n" +
+                "}\n" +
+                "]");
+        return "JSONInput";
     }
-
     /**
-     * Provides a challenge string that must be digitally signed for authentication.
-     * This string is used in the two-phase authentication process where clients
-     * must prove ownership of their private key by signing this challenge.
+     * Displays the form page for changing vote delegation.
+     * Provides interface for account holders to delegate their voting rights.
      *
-     * @return String challenge text that must be signed with the client's private key
+     * @param model Spring MVC model for passing form configuration to the view
+     * @return String view name "JSONInput" for the vote delegation form
      */
-    @ResponseBody
-    @GetMapping("/requestAuthenticationStringToSign")
-    public String requestAuthenticationStringToSign() {
-        return webServiceEngine.requestAuthenticationStringToSign();
-    }
-
-    /**
-     * Record class for server authentication requests.
-     * Contains all necessary information for validating a server's identity and connection.
-     *
-     * @param publicKey String Base64 encoded public key of the requesting server
-     * @param signedMessage String Base64 encoded signature of the challenge string
-     * @param connectionString String connection details for reaching the requesting server
-     * @param signedConnectionString String Base64 encoded signature of the connection string
-     */
-    public record AuthenticateServerRequest(String publicKey, String signedMessage, String connectionString, String signedConnectionString){
-    }
-
-    /**
-     * Authenticates a server attempting to join the network.
-     * Verifies that the requesting server owns the private key corresponding
-     * to their claimed public key by validating their digital signature.
-     *
-     * @param request AuthenticateServerRequest containing the public key, signed challenge,
-     *               connection string, and signed connection string for verification
-     * @return boolean true if authentication succeeds and server is accepted into network,
-     *         false if authentication fails
-     */
-    @ResponseBody
-    @PostMapping("/authenticateServer")
-    public boolean authenticateServerWrapper(@RequestBody AuthenticateServerRequest request) {
-        return webServiceEngine.authenticateServer(request.publicKey, request.signedMessage, request.connectionString, request.signedConnectionString );
-    }
-
-    /**
-     * Retrieves the current transport message being transmitted across the network.
-     * This endpoint provides access to the latest block data and can be used
-     * for network synchronization and as a cached response in CDN deployments.
-     *
-     * @return TransportMessageDataContract containing the current block data
-     *         and transaction information being propagated through the network
-     */
-    @ResponseBody
-    @GetMapping("/getCurrentlyTransmittedTransportMessage")
-    public TransportMessageDataContract getCurrentlyTransmittedTransportMessage()
-    {
-        return webServiceEngine.getCurrentlyTransmittedTransportMessage();
-    }
-
-    /**
-     * Submits a vote for changing ledger parameters.
-     * Allows validator nodes to propose modifications to system parameters
-     * such as transaction costs, block timing, and validation requirements.
-     *
-     * @param _LedgerParameters LedgerParameters object containing the proposed
-     *                         parameter changes to be voted on by the network
-     */
-    @ResponseBody
-    @PostMapping("/changeVotedParameters")
-    public void changeVotedParameters(@RequestBody LedgerParameters _LedgerParameters)//, String signatureBase64)
-    {
-        //if(Encryption.verifySignedMessage(_LedgerParameters.getStringToSign(), webServiceEngine.getEncryptionEntity().getPublicKey(),Encryption.base64ToByteArray(signatureBase64)))
-        //{
-        webServiceEngine.getPendingNextMessage().setVotedParameterChanges(_LedgerParameters);
-        //}
+    @GetMapping("/hdls-server-admin/updateAccountAttributes")
+    public String voteDelegation(Model model) {
+        model.addAttribute("apiEndpoint","/hdls/updateAccountAttributes");
+        model.addAttribute("title","update Account Attributes");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste JSON here:");
+        model.addAttribute("jsonDefault","{\n" +
+                "\"from\": \"ACCOUNT_PUBLIC_KEY\",\n" +
+                "\"name\": \"ACCOUNT_NEW_NAME\",\n" +
+                "\"delegated\": \"PUBLIC_KEY_SERVER\",\n" +
+                "\"blockId\": 5,\n" +
+                "\"previousRevisionHash\": \"HASH\",\n" +
+                "\"signatureValue\": \"SIGNATURE\"\n" +
+                "}");
+        return "JSONInput";
     }
 
     /**
@@ -428,9 +660,9 @@ public class WebServiceEndpoints
      * @param model Spring MVC model for passing form configuration to the view
      * @return String view name "JSONInput" for the parameter change form
      */
-    @GetMapping("/server/changeVotedParameters")
+    @GetMapping("/hdls-server-admin/changeVotedParameters")
     public String changeVotedParameters(Model model) {
-        model.addAttribute("apiEndpoint","/changeVotedParameters");
+        model.addAttribute("apiEndpoint","/hdls-server-admin/changeVotedParameters");
         model.addAttribute("title","Change Voted Parameters");
         model.addAttribute("info","");
         model.addAttribute("jsonLabel","Paste JSON here:");
@@ -440,7 +672,7 @@ public class WebServiceEndpoints
                 "\"maxConnections\": 20,\n" +
                 "\"amountRequestedToBeValidator\": \"1\",\n" +
                 "\"transactionCost\": \"0.1\",\n" +
-                "\"maxTransactionsPerBlock\": 1000\n" +
+                "\"maxTransactionsPerBlock\": 1000,\n" +
                 "\"distributedLedgerAccountReassignProposals\": [\n" +
                 "{\n" +
                 "    \"publicKey\":\"" +
@@ -465,223 +697,4 @@ public class WebServiceEndpoints
                 "]}");
         return "JSONInput";
     }
-
-    /**
-     * Retrieves the current status of the distributed ledger system.
-     * Provides comprehensive information about accounts, balances, validator nodes,
-     * and system parameters. Useful for monitoring and debugging the ledger state.
-     *
-     * @return StatusDataContract containing complete system status including
-     *         account balances, validator information, and current parameters
-     */
-    @ResponseBody
-    @GetMapping("/getStatus")
-    public StatusDataContract getStatus()
-    {
-        StatusDataContract ret;
-        ret = webServiceEngine.getStatusDataContract();
-        return ret;
-        //return webServiceEngine.getStatusDataContract();
-    }
-
-    /**
-     * Retrieves account information for a specific public key.
-     * Returns the account details including balance and validator assignment.
-     *
-     * @param _publicKey String public key of the account to query
-     * @return DistributedLedgerAccount containing account details and current balance,
-     *         or null if the account is not found
-     */
-    @ResponseBody
-    @PostMapping("/AccountTotals")
-    public DistributedLedgerAccount AccountTotal(@RequestBody String _publicKey) {
-        return DistributedLedgerAccount.find(webServiceEngine.getStatusDataContract().getAccountsList(), _publicKey);
-    }
-
-    /**
-     * Submits a list of payment transactions to be included in the next block.
-     * Validates and queues the transactions for processing by the network consensus.
-     * Each payment must be properly signed by the sender's private key.
-     *
-     * @param _requestedPayments List of ExternalPayment objects containing transaction details
-     *                          including sender, recipient, amount, and digital signature
-     * @return List<ExternalPayment> processed payments with validation results
-     *         and transaction IDs assigned by the system
-     */
-    @ResponseBody
-    @PostMapping("/spend")
-    public List<ExternalPayment> spendList(@RequestBody List<ExternalPayment> _requestedPayments) {
-        return webServiceEngine.notifySpend(_requestedPayments);
-    }
-
-    /**
-     * Displays the form page for submitting payment transactions.
-     * Provides interface for creating and submitting spend transactions to the network.
-     *
-     * @param model Spring MVC model for passing form configuration to the view
-     * @return String view name "JSONInput" for the payment submission form
-     */
-    @GetMapping("/server/spend")
-    public String spendListGet(Model model) {
-        model.addAttribute("apiEndpoint","/spend");
-        model.addAttribute("title","Receive spend messages");
-        model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Paste JSON here:");
-        model.addAttribute("jsonDefault", "[\n" +
-                "{\n" +
-                "\"publicKeyFrom\":\"PUBLIC_KEY_FROM\",\n" +
-                "\"publicKeyTo\":\"PUBLIC_KEY_TO\",\n" +
-                "\"paymentComment\":\"COMMENT\",\n" +
-                "\"amount\": \"1.00\",\n" +
-                "\"blockId\": 2\n" +
-                "},\n" +
-                "{\n" +
-                "\"publicKeyFrom\":\"PUBLIC_KEY_FROM\",\n" +
-                "\"publicKeyTo\":\"PUBLIC_KEY_TO\",\n" +
-                "\"paymentComment\":\"COMMENT\",\n" +
-                "\"amount\": \"1.00\",\n" +
-                "\"blockId\": 2\n" +
-                "}\n" +
-                "]");
-        return "JSONInput";
-    }
-
-    /**
-     * Submits a voting delegation change to the network.
-     * Allows account holders to delegate their voting rights to validator nodes
-     * for parameter changes and network governance decisions.
-     *
-     * @param _accountAttributesUpdate VotingDelegation object containing the delegation details
-     *                         including delegator, delegate, and digital signature
-     */
-    @ResponseBody
-    @PostMapping("/updateAccountAttributes")
-    public String updateAccountAttributes(@RequestBody AccountAttributesUpdate _accountAttributesUpdate) {
-        return  webServiceEngine.notifyupdateAccountAttributes(_accountAttributesUpdate);
-    }
-
-    /**
-     * Displays the form page for changing vote delegation.
-     * Provides interface for account holders to delegate their voting rights.
-     *
-     * @param model Spring MVC model for passing form configuration to the view
-     * @return String view name "JSONInput" for the vote delegation form
-     */
-    @GetMapping("/server/updateAccountAttributes")
-    public String voteDelegation(Model model) {
-        model.addAttribute("apiEndpoint","/updateAccountAttributes");
-        model.addAttribute("title","update Account Attributes");
-        model.addAttribute("info","");
-        model.addAttribute("jsonLabel","Paste JSON here:");
-        model.addAttribute("jsonDefault","{\n" +
-                "\"from\": \"ACCOUNT_PUBLIC_KEY\",\n" +
-                "\"name\": \"ACCOUNT_NEW_NAME\",\n" +
-                "\"delegated\": \"PUBLIC_KEY_SERVER\",\n" +
-                "\"blockId\": 5,\n" +
-                "\"previousRevisionHash\": \"HASH\",\n" +
-                "\"signatureValue\": \"SIGNATURE\"\n" +
-                "}");
-        return "JSONInput";
-    }
-
-    /**
-     * Manually processes a transport message data contract.
-     * This endpoint allows for manual injection of transport messages,
-     * typically used for testing or recovery scenarios.
-     *
-     * @param transportMessageDataContract TransportMessageDataContract containing
-     *                                   the message data to be processed by the system
-     */
-    @ResponseBody
-    @PostMapping("/processTransportMessageDataContract")
-    public void manualProcessTransportMessageDataContract(@RequestBody TransportMessageDataContract transportMessageDataContract) {
-        webServiceEngine.receiveData(transportMessageDataContract);
-    }
-
-    /**
-     * Retrieves the available balance for a specific account.
-     * Returns the current spendable amount for the given public key.
-     *
-     * @param publicKey String public key of the account to query
-     * @return BigDecimal representing the available balance for the specified account
-     */
-    @ResponseBody
-    @GetMapping("/getAmount")
-    public BigDecimal getAmount(String publicKey) {
-        return webServiceEngine.getAmountAvailable(publicKey);
-    }
-
-    /**
-     * Retrieves the current block ID being processed by the system.
-     * Useful for synchronization and determining the current state of the ledger.
-     *
-     * @return int current block ID that is being transmitted across the network
-     */
-    @ResponseBody
-    @GetMapping("/getBlockId")
-    public int getBlockId()
-    {
-        return this.webServiceEngine.getCurrentlyTransmittedTransportMessage().getBlockId();
-    }
-
-    @ResponseBody
-    @GetMapping("/getLedgerHistory")
-    public LedgerHistory getLedgerHistory()
-    {
-        return this.webServiceEngine.getLedgerHistory();
-    }
-    @ResponseBody
-    @GetMapping("/getLedgerHistoryInterval")
-    public LedgerHistory getLedgerHistoryInterval(int start, int end)
-    {
-        return this.webServiceEngine.getLedgerHistory().getInterval(start,end);
-    }
-
-    @ResponseBody
-    @GetMapping("/setNewLedgerHistoryOrigin")
-    public String setNewLedgerOrigin(int id)
-    {
-        this.webServiceEngine.getLedgerHistory().changeOriginalContract(id);
-        return "OK";
-    }
-
-    public void startTimer() {
-
-        //this.webServiceEngine.startTimer();
-
-        //starting from the hour to soft align the timescales
-        final long epochNow = Instant.now().toEpochMilli();
-        final long epochHourInMilli = epochNow - Math.floorMod(Instant.now().toEpochMilli(), 1000 * 60 * 60);
-        final long schedulerMargin = webServiceEngine.getStatusDataContract().getLedgerParameters().getFrameProcessingTimeMilliseconds();
-        final long timePerFrame =  Math.divideExact( 1000*60*60 ,Math.max(webServiceEngine.getStatusDataContract().getLedgerParameters().getMessageUpdateFrequencyPerHour(),1));
-        long counter;
-        //find the time of the start of the next blockTempVersion that happens in the future
-        counter = ((epochNow - epochHourInMilli + 2 * schedulerMargin) + timePerFrame - 1) / timePerFrame;
-        //and then get the time interval so that it starts on time
-        long interval = (epochHourInMilli + counter *timePerFrame) - epochNow;
-        long interval2 = interval + webServiceEngine.getStatusDataContract().getLedgerParameters().getFrameProcessingTimeMilliseconds();
-        try
-        {
-            scheduler.schedule(this::TimedProcessingEvent, interval, TimeUnit.MILLISECONDS);
-            scheduler.schedule(this::TimedReadingEvent, interval2, TimeUnit.MILLISECONDS);
-            scheduler.schedule(this::startTimer,interval2 - schedulerMargin,TimeUnit.MILLISECONDS);
-        }
-        catch (Exception e)
-        {
-            ErrorHandling.logEvent("error",true,e);
-            //throw new RuntimeException("fail");
-        }
-
-    }
-
-    public void TimedProcessingEvent()
-    {
-        this.webServiceEngine.TimedProcessingEvent();
-    }
-    public void TimedReadingEvent()
-    {
-        this.webServiceEngine.TimedReadingEvent();
-    }
-
-
 }

@@ -12,7 +12,7 @@ public class ErrorHandling {
      */
     public static void logEvent( String eventDesc, boolean throwError, Exception e)
     {
-        System.out.print(eventDesc);
+        System.out.print(eventDesc + "\n");
         if (throwError)
         {
             throw new RuntimeException(e);

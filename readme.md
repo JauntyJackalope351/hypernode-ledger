@@ -1,10 +1,11 @@
 
 
-# Hypernode distributed ledger
+# Hypernode distributed ledger system
 
 This program aims to create a distributed ledger with the goal of illustrating the Hypernode validation algorithm.  
 It is a Proof of Stake system that supports delegation, can scale well, requires little power,supports multiple signing
-algorithms(tested with RSA and ML-DSA-87),can relay messages and has a built-in voting system to update its own ledger parameters.  
+algorithms(tested with RSA and ML-DSA-87),can relay messages, has a built-in voting system to update its own ledger parameters
+and a built in DNS system.  
 It was written from scratch in Java using the Spring framework, as it is a very easy language to read, understand and validate.  
 One of the reason for the creation of this program was that the Bitcoin code was not intuitive to read or easy to deploy,
 so auditability and ease of startup were important objectives of this project.  
@@ -256,39 +257,40 @@ or if you want to use quantum safe encryption you can run it with
 `java -jar /path/to/file/ledger.jar --server.port=8081 --encryption.keyAlgo=ML-DSA-87 --encryption.signAlgo=ML-DSA-87`  
 
 It is important to use nginx to only forward specific endpoints and keep the management of the app in local.  
-The endpoints to forward are:  
-/server  
-/newKeyPair  
-/requestAuthenticationStringToSign  
-/authenticateServer  
-/initialize  
-/AccountTotals  
-/getAmount  
-/getStatus  
-/spend  
-/updateAccountAttributes  
-/getBlockId  
-/getLedgerHistory  
-/getCurrentlyTransmittedTransportMessage
+The endpoints to forward are contained in the /hdls/ subfolder (Hypernode Distributed Ledger System)
+/hdls/requestAuthenticationStringToSign  
+/hdls/authenticateServer  
+/hdls/initialize  
+/hdls/AccountTotals  
+/hdls/getAmount  
+/hdls/getStatus  
+/hdls/spend  
+/hdls/updateAccountAttributes  
+/hdls/getBlockId  
+/hdls/getLedgerHistory  
+/hdls/getCurrentlyTransmittedTransportMessage
+/hdls/getAccountInfo
+/hdls/getIPAddress
 
 #### Initializing the server
 
 You can use this program to connect to an existing distributed ledger or to create your own new ledger.  
 First of all assign an EncryptionEntity  
-(endpoint WebServiceEndpoints.setEncryptionEntityIntegrated(), webpage server/setEncryptionEntityIntegrated)
-you can either generate a key pair from Terminal with ssh-keygen or call /newKeyPair.  
+(endpoint WebServiceEndpoints.setEncryptionEntityIntegrated(), webpage /hdls-server-admin/setEncryptionEntityIntegrated)
+you can either generate a key pair from Terminal with ssh-keygen or call /hdls-client/newKeyPair.  
 
 ##### Connect to an existing ledger:
 
 Call the endpoint InitAndConnectToExistingLedger  
-(endpoint WebServiceEndpoints.initAndConnectToExistingLedger(), webpage /server/createNewLedger)  
+(endpoint WebServiceEndpoints.initAndConnectToExistingLedger(), webpage /hdls-server-admin/createNewLedger)  
 to connect to the specified target node.  
-A template is included in the webpage, you will need to specify your http address and your target server's http address.  
+A template is included in the webpage, you will need to specify your address and your target server's address.
+Please use the IP address instead of domain names (i.e. http://1.2.3.4/ instead of http://mysite.net)
 
 ##### Create a new ledger:  
 
 Call the endpoint InitCreateNewLedger  
-(endpoint WebServiceEndpoints.initCreateNewLedger(), webpage /server/joinExistingLedger),  
+(endpoint WebServiceEndpoints.initCreateNewLedger(), webpage /hdls-server-admin/joinExistingLedger),  
 specifying the parameters in the initial StatusDataContract.  
 You will then be able to connect to this server from another instance of this program as described in "Connect to an existing ledger".  
 A template is included in the default webpage, you will need to replace the address placeholders with the actual addresses.  
@@ -305,7 +307,7 @@ This client needs to utilize an EncryptionInterface, like a chip and pin, a dedi
 or the integrated app option.  
 This EncryptionInterface needs to sign messages and show its public key,
 to verify that it is really the user doing the authorization.  
-You can generate a private and public key by calling the endpoint /newKeyPair, and the public key is effectively
+You can generate a private and public key by calling the endpoint /hdls-client/newKeyPair, and the public key is effectively
 the account name and the privateKey is the equivalent of the password.  
 If your currency starts to gain value I'd recommend to switch to chip&pin systems to avoid keeping the key
 in the JVM memory, but this is not really a concern when starting out a low value ledger.  
@@ -316,14 +318,19 @@ You can find a code sample to instantiate an EncryptionInterface in the Test are
 The object ExternalPayment represents a payment as it needs to be compiled by the client.  
 It does specify the sender and the recipient key (in base64) or his friendly name, the comment, which block is going to be processed in,
 the amount to be paid and the signature of the message itself.  
-The resulting payments can be grouped into a list and communicated to the validatornode by calling the endpoint /spend.  
+The resulting payments can be grouped into a list and communicated to the validatornode by calling the endpoint /hdls/spend.  
 
 ##### Update Account Attributes
 
 If your current validatorNode is not representing you correctly you can choose to change it.  
-Contact any other validatorNode at the /votedelegation endpoint, and sign your desire to change your delegation.  
+Contact any other validatorNode at the /hdls/votedelegation endpoint, and sign your desire to change your delegation.  
 You could even point the vote to yourself, and if you have enough votes log in as a validatornode as specified on point 1a.  
 The same process can be used to change your public friendly name, if the name you have chosen is not already taken.  
+
+##### Retrieve account information
+
+The endpoint /hdls/getAccountInfo will provide you with all the informations associated with a specific name or public key,
+if you only want to find out the IP address for a specific public key (or for a specific name) you can call /hdls/getIPAddress
 
 #### Server operation
 
@@ -343,7 +350,7 @@ List of ValidatorNodes, which contains the references to the other peers in the 
   they move it into the TransportMessageDataContract, which will then be copied into
   currentlyTransmittedTransportMessage and exposed for every peer to see.
 - Exposing the data
-  currentlyTransmittedTransportMessage is then made available by calling a GET endpoint /getCurrentlyTransmittedTransportMessage.  
+  currentlyTransmittedTransportMessage is then made available by calling a GET endpoint /hdls/getCurrentlyTransmittedTransportMessage.  
   This has the advantage that it is way more resilient to DDOS as the HTTP request can be distributed
   by a CDN, using a load balancer to forward the original HTTP message to a pool of servers.  
   It can also be used to detach the machines sharing the data from the machine that's actually doing the processing.  
@@ -352,7 +359,7 @@ List of ValidatorNodes, which contains the references to the other peers in the 
   This is important because it is by others relaying the message of other peers that we are able to validate
   that one specific node has been acknowledged by the whole network.  
 - Propagating messages and read receipts
-  At regular intervals (specified in the LedgerParameter) the message that is exposed in the /getCurrentlyTransmittedTransportMessage
+  At regular intervals (specified in the LedgerParameter) the message that is exposed in the /hdls/getCurrentlyTransmittedTransportMessage
   is updated,and a new read is performed on this node's peers, as illustrated in the Explaining the Hypernode section.  
   We do add one extra turn of message exchange, so that if one of your contacts is offline you would still receive
   the messages he's supposed to carry.  
@@ -374,7 +381,7 @@ List of ValidatorNodes, which contains the references to the other peers in the 
   It is possible for the validator nodes to change the network LedgerParameters values as well as to reassign the amount in an account,
   if more than 50% of the voting delegation agrees to it.  
   This is how you can "print money" and finance your community endeavors.  
-  Call the endpoint /changeVotedParameters to pass the desired parameters, and keep an eye on the transaction history
+  Call the endpoint /hdls/changeVotedParameters to pass the desired parameters, and keep an eye on the transaction history
   (as you need to coordinate, because only when you get over 50% of the votes the system changes setup)
 
 #### Tips for a better experience
@@ -384,7 +391,7 @@ in the voting parts of the program. This is balanced by the fact that it is not 
 is very easy to fork. If the community believes you are not operating in the interest of the whole community
 they can create a fork and, for all intents and purposes, operating on the forked system is a vote to kick you out of the community.  
 To enhance the robustness of the network do not assign more than 3% of the total votes to the same validator node.  
-Use a CDN/ load balancer to expose the /getCurrentlyTransmittedTransportMessage, so the computer doing the calculations is not directly exposed to the web.  
+Use a CDN/ load balancer to expose the /hdls/getCurrentlyTransmittedTransportMessage, so the computer doing the calculations is not directly exposed to the web.  
 Use some sort of VPN or similar to limit the amount of people who could DDoS your server, maybe even write an interface
 so that those gathering data can be blocked by a login page that is disconnected from the core system.  
 Ideally the private key and public key should be implemented in a chip and pin card or equivalent, making key extraction
@@ -604,7 +611,7 @@ Here is a table comparing the options:
 [Latest version of this readme](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/readme.md) - The last version of the project documentation.  
 [Quick start guide](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/quickstart.pdf)  - Illustrated documentation on how to operate the program  
 [Community bootstrap guide (AI generated)](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/community_bootstrap.md)  - Some ideas on how to start your own community  
-[Java applet](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/ledger.jar) - The actual Java application - 908a4bd7ce270d6903ef2729383f1944
+[Java applet](https://github.com/JauntyJackalope351/hypernode-ledger/blob/main/ledger.jar) - The actual Java application - 
 
 
 </details> 

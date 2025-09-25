@@ -60,7 +60,7 @@ public class Encryption {
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("error",false,e);
+            ErrorHandling.logEvent("error encryption.base64ToByteArray",false,e);
             return "".getBytes();
         }
     }
@@ -73,7 +73,7 @@ public class Encryption {
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("error",false,e);
+            ErrorHandling.logEvent("error Encryption.ByteArrayToBase64",false,e);
             return "";
         }
     }
@@ -102,7 +102,7 @@ public class Encryption {
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("signature failed",false,e);
+            ErrorHandling.logEvent("signature verification failed",false,e);
             return false;
         }
     }

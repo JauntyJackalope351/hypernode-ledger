@@ -25,25 +25,33 @@ public class ClientEngine {
 
     public BigDecimal getAmountAvailable(String publicKey)
     {
-        return WebServiceCaller.callServerMethodThrows(endpoint, "getAmount", publicKey, new TypeReference<BigDecimal>() {});
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/getAmount", publicKey, new TypeReference<BigDecimal>() {});
     }
 
     public List<ExternalPayment> sendPayments(List<ExternalPayment> paymentList)
     {
-        return WebServiceCaller.callServerMethodThrows(endpoint, "spend", paymentList, new TypeReference<List<ExternalPayment>>() {});
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/spend", paymentList, new TypeReference<List<ExternalPayment>>() {});
     }
 
     public int getNextAvailablePaymentBlock()
     {
-        return 1+ WebServiceCaller.callServerMethodThrows(endpoint, "getBlockId", null, new TypeReference<Integer>() {});
+        return 1+ WebServiceCaller.callServerMethodThrows(endpoint, "hdls/getBlockId", null, new TypeReference<Integer>() {});
     }
     public String getAccountTotal(String publicKey)
     {
-        return WebServiceCaller.callServerMethodThrows(endpoint, "AccountTotals", publicKey, new TypeReference<String>() {});
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/AccountTotals", publicKey, new TypeReference<String>() {});
+    }
+    public String getIPAddress(String publicKey)
+    {
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/getIPAddress", publicKey, new TypeReference<String>() {});
+    }
+    public String getAccountInfo(String publicKey)
+    {
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/getAccountInfo", publicKey, new TypeReference<String>() {});
     }
     public StatusDataContract getStatus()
     {
-        StatusDataContract ret =  WebServiceCaller.callServerMethodThrows(endpoint, "getStatus", null, new TypeReference<StatusDataContract>() {});
+        StatusDataContract ret =  WebServiceCaller.callServerMethodThrows(endpoint, "hdls/getStatus", null, new TypeReference<StatusDataContract>() {});
         if(Encryption.hash(ret.getStringToSign()).equals(ret.getHash()))
         {
             return ret;
@@ -61,7 +69,7 @@ public class ClientEngine {
         accountAttributesUpdate.setBlockId(json.getBlockId());
         accountAttributesUpdate.setPreviousBlockHash(json.getPreviousBlockHash());
         accountAttributesUpdate.setSignatureValue(this.encryptionEntity.signMessage(accountAttributesUpdate.getStringToSign()));
-        return WebServiceCaller.callServerMethodThrows(endpoint, "updateAccountAttributes", accountAttributesUpdate, new TypeReference<String>() {});
+        return WebServiceCaller.callServerMethodThrows(endpoint, "hdls/updateAccountAttributes", accountAttributesUpdate, new TypeReference<String>() {});
     }
 
     public void setEndpoint(String endpoint) {this.endpoint = endpoint;}
