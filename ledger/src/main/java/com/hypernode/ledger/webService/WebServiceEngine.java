@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +25,7 @@ public class WebServiceEngine {
     StatusDataContract statusDataContract;
     TransportMessageDataContract transportMessageDataContract;
     TransportMessageDataContract currentlyTransmittedTransportMessage;
+    TransportMessageDataContract nextTransmittedTransportMessage;
     ValidatorMessageDataContract pendingNextMessage;
     ValidatorNode thisValidatorNode;
     List<ValidatorNode> peers;
@@ -31,7 +33,8 @@ public class WebServiceEngine {
     LedgerHistory ledgerHistory;
     BlockRevisionResult blockRevisionResult;
 
-    public void TimedProcessingEvent() {
+    public void TimedUpdatingEvent() {
+        ErrorHandling.logEvent("TimedProcessingEvent",false,null);
         // changed from POST to GET
         //
         // the comment below explains why we moved from a POST design (other nodes send you their data)
@@ -56,23 +59,58 @@ public class WebServiceEngine {
 
     public void TimedReadingEvent()
     {
-        for (ValidatorNode peer : this.peers) {
-            try {
+        //TODO use executors to read in parallel?
+        // no, i would have to rewrite everything to be thread safe.
+        List<ValidatorNode> retryPeers = new ArrayList<>();
+        for (ValidatorNode peer : this.peers)
+        {
+            try
+            {
                 String connectionString = peer.getConnectionString();
-                TransportMessageDataContract peerMessage = WebServiceCaller.callServerMethod(
+                TransportMessageDataContract peerMessage = WebServiceCaller.callServerMethodThrows(
                         connectionString,
-                        "getCurrentlyTransmittedTransportMessage",
+                        "hdls/getCurrentlyTransmittedTransportMessage",
                         null,
-                        new TypeReference<>() {}
+                        new TypeReference<>() {
+                        }
                 );
                 this.receiveData(peerMessage);
             }
-            catch (IOException | InterruptedException e)
+            catch (Exception e)
             {
-                ErrorHandling.logEvent("error",false,e);
+                ErrorHandling.logEvent("failed reading data from" + peer.getConnectionString(), false, e);
                 // log or handle errors
+                // have a retry
+                retryPeers.add(peer);
             }
         }
+        try
+        {
+            wait(5000); //wait a second before retrying
+        }
+        catch (Exception e)
+        {
+
+        }
+        for (ValidatorNode peer : retryPeers) {
+            try
+            {
+                String connectionString = peer.getConnectionString();
+                TransportMessageDataContract peerMessage = WebServiceCaller.callServerMethodThrows(
+                        connectionString,
+                        "hdls/getCurrentlyTransmittedTransportMessage",
+                        null,
+                        new TypeReference<>() {
+                        }
+                );
+                this.receiveData(peerMessage);
+            }
+            catch (Exception e)
+            {
+                ErrorHandling.logEvent("failed re-reading data from" + peer.getConnectionString(), false, e);
+            }
+        }
+        this.prepareNextMessage();
     }
 
     /**
@@ -89,28 +127,51 @@ public class WebServiceEngine {
         try
         {
             _dataContract.nameToPublicKey(this.statusDataContract.getDistributedLedgerAccounts());
-            //if you want to be strict and only receive from your peers
-            validatorNode = ValidatorNode.findByPublicKey(this.peers, _dataContract.getSignature().getPublicKey());
-            //TODO use this instead if you want to manually enter the messages
+            //TODO now the system is strict and only receives from your peers
+            // to avoid ddos or flooding.
+            // if you want to manually enter the messages use this line instead
             // validatorNode = ValidatorNode.findByPublicKey(this.statusDataContract.getValidatorNodeList(), _dataContract.getSignature().getPublicKey());
+            validatorNode = ValidatorNode.findByPublicKey(this.peers, _dataContract.getSignature().getPublicKey());
+
+            if ( _dataContract.getSignature().getPublicKey().equals(validatorNode.getPublicKey())
+                    && Encryption.verifySignedMessage(_dataContract.getStringToSign(), _dataContract.getSignature())
+            )
+            {
+                //someone gave you data, you have to process it and see if it is still good
+                this.transportMessageDataContract.storeDataContract(_dataContract, this.getEncryptionEntity());
+            }
+            else
+            {
+                ErrorHandling.logEvent("error before receiveData for " + _dataContract.getSignature().getPublicKey(),false,null);
+            }
+            //else ... ignore the message
+
         }
         catch (Exception e)
-        {// TODO that server is not within my peer list, you might want to remove this check if you manually enter elements
-            ErrorHandling.logEvent("error",false,e);
+        {
+            ErrorHandling.logEvent("error during receiveData for " + _dataContract.getSignature().getPublicKey(),false,e);
             return;
         }
 
-        if (validatorNode.getPublicKey().equals( _dataContract.getSignature().getPublicKey())
-                && Encryption.verifySignedMessage(_dataContract.getStringToSign(), _dataContract.getSignature())
-        )
-        {
-            //someone gave you data, you have to process it and see if it is still good
-            this.transportMessageDataContract.storeDataContract(_dataContract, this.getEncryptionEntity());
-        }
-        //else ... ignore the message
+
     }
 
-    public boolean updateCurrentMessage() {
+    public boolean updateCurrentMessage()
+    {
+        this.currentlyTransmittedTransportMessage = this.nextTransmittedTransportMessage.hardCopy();
+        this.currentlyTransmittedTransportMessage.setSent(Instant.now());
+        ErrorHandling.logEvent("updateCurrentMessage block " + this.currentlyTransmittedTransportMessage.getBlockId()
+                + "rev " + this.currentlyTransmittedTransportMessage.getBlockRevision()
+                + "version" + this.currentlyTransmittedTransportMessage.getBlockTempVersion()
+                ,false,null
+        );
+
+        return true;
+
+    }
+
+    public void prepareNextMessage()
+    {
         //implements point 3b
         TransportMessageDataContract messageToSend;
         boolean newRevision;
@@ -124,9 +185,13 @@ public class WebServiceEngine {
         {
             messageToSend = this.processDataContractRevision();
         }
-        this.currentlyTransmittedTransportMessage = messageToSend.hardCopy();
-        this.currentlyTransmittedTransportMessage.publicKeyToName(this.statusDataContract.getDistributedLedgerAccounts());
-        return true;
+        this.nextTransmittedTransportMessage = messageToSend.hardCopy();
+        this.nextTransmittedTransportMessage.signContract(this.encryptionEntity);
+        this.nextTransmittedTransportMessage.publicKeyToName(this.statusDataContract.getDistributedLedgerAccounts());
+        ErrorHandling.logEvent("updated nextTransmittedTransportMessage id " + nextTransmittedTransportMessage.getBlockId()
+                +" rev " + nextTransmittedTransportMessage.getBlockRevision()
+                + "ver " + nextTransmittedTransportMessage.getBlockTempVersion()
+                ,false,null);
     }
 
     /**
@@ -137,7 +202,6 @@ public class WebServiceEngine {
     private TransportMessageDataContract newDataContractTempVersion() {
         this.transportMessageDataContract.setBlockTempVersion(this.transportMessageDataContract.getBlockTempVersion() +1);
         this.transportMessageDataContract.setSent( now());
-        this.transportMessageDataContract.signContract(this.getEncryptionEntity());
 
         return this.transportMessageDataContract;
     }
@@ -201,7 +265,7 @@ public class WebServiceEngine {
         try {
             List<Callable<Boolean>> tasks = validatorNodes.stream()
                     .map(node -> (Callable<Boolean>) () -> WebServiceCaller.callServerMethodThrows(
-                            node.getConnectionString(), "initialize", statusDataContract, new TypeReference<Boolean>() {
+                            node.getConnectionString(), "hdls/initialize", statusDataContract, new TypeReference<Boolean>() {
                             }))
                     .toList();
             executor.invokeAll(tasks); // wait for completion, handle exceptions if needed
@@ -259,6 +323,24 @@ public class WebServiceEngine {
             //not enough credit to become a validator
             return false;
         }
+
+        if(!ValidatorNode.validateConnectionString(_connectionString))
+        {
+            return false;
+        }
+
+        //test the connection string to verify that it is the correct server?
+        String publicKeyConnectionString = WebServiceCaller.callServerMethodThrows(
+                _connectionString,
+                "hdls/getPublicKey",
+                null,
+                new TypeReference<String>() {}
+        );
+        if(!_publicKey.equals(publicKeyConnectionString))
+        {
+            return false;
+        }
+
 
         //valid authentication, put this into the queue
         //it will be sent out to be discussed in the next block.
@@ -319,6 +401,34 @@ public class WebServiceEngine {
             return BigDecimal.ZERO;
 
         }
+    }
+
+    public AccountInfo getAccountInfo(String id)
+    {
+        AccountInfo ret = new AccountInfo();
+        DistributedLedgerAccount account;
+        ValidatorNode node;
+        if(id.length()<200)
+        {
+            account = this.statusDataContract.getAccountsList().stream().filter(d -> d.getName().equals(id)).findFirst().orElse(new DistributedLedgerAccount());
+        }
+        else
+        {//TODO postman has a bug where the id gets truncated when it has a "+" in it
+            account = this.statusDataContract.getAccountsList().stream().filter(d -> d.getPublicKey().equals(id)).findFirst().orElse(new DistributedLedgerAccount());
+        }
+        if(account.getPublicKey().isEmpty())
+        {
+            return ret;
+        }
+        ret.setAccount(account);
+        node = this.statusDataContract.getValidatorNodeList().stream().filter(v -> v.getPublicKey().equals(account.getPublicKey())).findFirst().orElse(new ValidatorNode());
+        ret.setNode(node);
+        return ret;
+    }
+
+    public int getBlockId()
+    {
+        return this.nextTransmittedTransportMessage.getBlockId();
     }
 
     public EncryptionEntity_BaseInterface getEncryptionEntity(){ return encryptionEntity;}

@@ -37,7 +37,7 @@ public class LedgerHistory
             }
             catch (Exception e)
             {
-                ErrorHandling.logEvent("error",false,e);
+                ErrorHandling.logEvent("error LedgerHistory.getInterval",false,e);
                 return null;
             }
 
@@ -59,7 +59,7 @@ public class LedgerHistory
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("error",false,e);
+            ErrorHandling.logEvent("error LedgerHistory.changeOriginalContract",false,e);
         }
     }
 

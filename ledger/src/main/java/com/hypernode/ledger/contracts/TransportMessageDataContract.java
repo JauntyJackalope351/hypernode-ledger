@@ -41,7 +41,7 @@ public class TransportMessageDataContract
         catch (JsonProcessingException e)
         {
             //should never happen
-            ErrorHandling.logEvent("error",true,e);
+            ErrorHandling.logEvent("error TransportMessageDataContract.hardCopy",true,e);
             //throw new RuntimeException(e);
             return null;
         }
@@ -53,10 +53,13 @@ public class TransportMessageDataContract
         SignedValidatorMessage currentSignedValidatorMessage;
         Iterator<SignedValidatorMessage> iterator;
 
-        if(this.blockId == _newContract.getBlockId() && this.blockTempVersion == _newContract.getBlockTempVersion()) {
+        if(     this.blockId == _newContract.getBlockId()
+                && this.blockRevision == _newContract.getBlockRevision()
+                && this.blockTempVersion == _newContract.getBlockTempVersion()
+        )
+        {
             _newContract.received = Instant.now();
             //TransportMessageDataContract.updateList(this.peerContracts, _newContract);// FOR DEBUG ONLY, TO BE REMOVED
-
             //merge the lists, sign the signaturechain if you need to
 
             iterator = _newContract.signedValidatorMessages.iterator();
@@ -69,6 +72,10 @@ public class TransportMessageDataContract
                             .filter(s -> TransportMessageDataContract.validateBlockRevisionSignature(s, this)).toList());
                 }
             }
+        }
+        else
+        {
+            throw new RuntimeException();
         }
     }
 
@@ -113,6 +120,7 @@ public class TransportMessageDataContract
     public void signContract(EncryptionEntity_BaseInterface _encryptionEntity)
     {
         this.signature = Signature.create(_encryptionEntity, this.getStringToSign(),false);
+        // useful in debug, return to false after testing
     }
     @JsonIgnore
     public String getStringToSign()
@@ -130,7 +138,6 @@ public class TransportMessageDataContract
         this.setPreviousBlockRevisionResultSignatures(Signature.publicKeyToName(this.getPreviousBlockRevisionResultSignatures(),accounts));
         this.setSignature(Signature.publicKeyToName(this.getSignature(),accounts));
         this.setSignedValidatorMessages(this.getSignedValidatorMessages().stream().map(s -> s.publicKeyToName(accounts)).collect(Collectors.toSet()));
-
     }
 
     public void nameToPublicKey(Set<DistributedLedgerAccount> accounts)

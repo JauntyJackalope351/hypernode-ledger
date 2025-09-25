@@ -29,7 +29,7 @@ public class DistributedLedgerAccount
         }
         catch (Exception e)
         {
-            ErrorHandling.logEvent("empty find",false,e);
+            ErrorHandling.logEvent("error: empty find DistributedLedgerAccount.find",false,e);
             return new DistributedLedgerAccount();
         }
     }
@@ -143,7 +143,7 @@ public class DistributedLedgerAccount
         {
             this.name = name.substring(0,200);
         }
-    }//TODO accountNameLength
+    }//TODO accountNameLength as parameter?
     public void setDescription(String description){
         this.description = description;
         if(description.length()>2000)

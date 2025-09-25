@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.hypernode.ledger.encryptionInterfaces.Encryption;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -26,39 +28,13 @@ public class ValidatorNode
 
     public static List<ValidatorNode> merge(List<ValidatorNode> _list, Set<ValidatorNode> _validatorNodesUpdate, LedgerParameters _ledgerParameters)
     {
-        //Iterator<ValidatorNode> validatorNodesUpdateIterator = _validatorNodesUpdate.iterator();
         ListIterator<ValidatorNode> validatorNodeListIterator;
         ValidatorNode validatorNode;
         ValidatorNode existingValidatorNode;
         int listSize;
         List<ValidatorNode> processingList = new ArrayList<>();
         List<ValidatorNode> returnList = new ArrayList<>();
-        //processingList.addAll(_list);
-        /*
-        //scroll through the validatornodes to add
-        while (validatorNodesUpdateIterator.hasNext())
-        {
-            validatorNode = validatorNodesUpdateIterator.next();
-            ValidatorNode finalValidatorNode = validatorNode;
-            try
-            {
-                //if it already exists remove the old validatornode
-                existingValidatorNode = processingList.stream().filter(ValidatorNode -> ValidatorNode.getPublicKeyBase64().equals( finalValidatorNode.getPublicKeyBase64())).findFirst().get();
-                processingList.remove(existingValidatorNode);
 
-            }
-            catch (Exception e)
-            {
-                //item does not exist so no need to remove it
-            }
-            if(!finalValidatorNode.connectionString.isEmpty())
-            {
-                processingList.add(finalValidatorNode);
-            }
-        }
-        Collections.sort(processingList, (a, b) -> b.getPublicKeyBase64().compareTo(a.getPublicKeyBase64()));
-
-        */
         processingList.addAll(
                 _validatorNodesUpdate.stream()
                         .filter(v -> !v.connectionString.isEmpty() && !v.connectionString.isBlank())
@@ -86,7 +62,8 @@ public class ValidatorNode
     @JsonIgnore
     public boolean validate()
     {
-        return Encryption.verifySignedMessage(this.getStringToSign(), this.getPublicKey(), this.getSignature());
+        return validateConnectionString(this.connectionString)
+                && Encryption.verifySignedMessage(this.getStringToSign(), this.getPublicKey(), this.getSignature());
     }
     @JsonIgnore
     public String getStringToSign()
@@ -112,6 +89,32 @@ public class ValidatorNode
                 ":" + getPublicKey() +
                 ":" + getSignature()
                 ;
+    }
+
+    public String ipAddress()
+    {
+        return ValidatorNode.connectionStringToIPAddress(this.connectionString);
+    }
+
+    public static boolean validateConnectionString(String connectionString)
+    {
+        String ret = ValidatorNode.connectionStringToIPAddress(connectionString);
+        return !ret.isBlank();
+    }
+    public static String connectionStringToIPAddress(String connectionString)
+    {
+        // This regex pattern matches an IPv4 address.
+        // It looks for four sets of 1-3 digits separated by dots.
+        String ipv4Pattern = "(\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b)";
+
+        Pattern pattern = Pattern.compile(ipv4Pattern);
+        Matcher matcher = pattern.matcher(connectionString);
+
+        if (matcher.find()) {
+            return matcher.group(1);
+        } else {
+            return ""; // Return an empty string if no IPv4 address is found
+        }
     }
 
 

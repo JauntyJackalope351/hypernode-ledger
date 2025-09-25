@@ -1,6 +1,7 @@
 package com.hypernode.ledger.webService;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.hypernode.ledger.ErrorHandling;
 import com.hypernode.ledger.contracts.*;
 import com.hypernode.ledger.controller.WebServiceEndpoints;
 
@@ -22,6 +23,7 @@ public class WebServiceInitializer {
         //start everything up
         while(_this.currentlyTransmittedTransportMessage.getBlockId()< 3)
         {
+            _this.prepareNextMessage();
             _this.updateCurrentMessage();
         }
 
@@ -42,11 +44,11 @@ public class WebServiceInitializer {
             return "EncryptionEntity not configured";
         }
 
-        authenticationString = WebServiceCaller.callServerMethodThrows(_connectionStringServer, "requestAuthenticationStringToSign",
+        authenticationString = WebServiceCaller.callServerMethodThrows(_connectionStringServer, "hdls/requestAuthenticationStringToSign",
                 null, new TypeReference<>() {
                 });
         WebServiceEndpoints.AuthenticateServerRequest request = new WebServiceEndpoints.AuthenticateServerRequest(_this.getEncryptionEntity().getPublicKey(), _this.getEncryptionEntity().signMessage(authenticationString), _thisConnectionString, _this.getEncryptionEntity().signMessage(_thisConnectionString));
-        if(WebServiceCaller.callServerMethodThrows(_connectionStringServer, "authenticateServer", request, new TypeReference<Boolean>() {
+        if(WebServiceCaller.callServerMethodThrows(_connectionStringServer, "hdls/authenticateServer", request, new TypeReference<Boolean>() {
         }))
         {
             return "OK";
@@ -73,8 +75,10 @@ public class WebServiceInitializer {
         _this.peers = _this.statusDataContract.getLedgerParameters().calculatePeers(_this.statusDataContract.getValidatorNodeList(), _this.thisValidatorNode.getAddress());
         _this.transportMessageDataContract = TransportMessageDataContract.create(1,_lastDataContract,message, _this.getEncryptionEntity());
         //_this.transportMessageDataContract.setPeerContracts(new HashSet<>());
-        _this.currentlyTransmittedTransportMessage = _this.transportMessageDataContract.hardCopy();
-        _this.currentlyTransmittedTransportMessage.publicKeyToName(_this.statusDataContract.getDistributedLedgerAccounts());
+
+        _this.nextTransmittedTransportMessage = _this.transportMessageDataContract.hardCopy();
+        _this.nextTransmittedTransportMessage.publicKeyToName(_this.statusDataContract.getDistributedLedgerAccounts());
+        _this.currentlyTransmittedTransportMessage = _this.nextTransmittedTransportMessage;
         _this.pendingNextMessage = ValidatorMessageDataContract.createEmpty(message.getId()+1);
         _this.pendingNextMessage.setPaymentSet( new HashSet<>());
         _this.pendingNextMessage.setValidatorNodes(new HashSet<>());
@@ -85,5 +89,6 @@ public class WebServiceInitializer {
         //with the other servers.
         //the first block revision you will listen and populate your startingLedger
         //and from the subsequent you will be able to send your own transactions
+        ErrorHandling.logEvent("initialized",false,null);
     }
 }
