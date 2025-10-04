@@ -1,5 +1,6 @@
 package com.hypernode.ledger.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.hypernode.ledger.ErrorHandling;
 import com.hypernode.ledger.client.ExternalPayment;
 import com.hypernode.ledger.contracts.*;
@@ -7,6 +8,7 @@ import com.hypernode.ledger.contracts.DistributedLedgerAccount;
 import com.hypernode.ledger.encryptionInterfaces.Encryption;
 import com.hypernode.ledger.encryptionInterfaces.EncryptionEntity_ExternalServer;
 import com.hypernode.ledger.encryptionInterfaces.EncryptionEntity_Integrated;
+import com.hypernode.ledger.webService.WebServiceCaller;
 import com.hypernode.ledger.webService.WebServiceEngine;
 import com.hypernode.ledger.webService.WebServiceInitializer;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +21,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -55,7 +54,7 @@ public class WebServiceEndpoints
     @ResponseBody
     @GetMapping("/hdls/version")
     public String getVersion() {
-        return "2025.9.14.1";
+        return "2025.10.04.1";
     }
 
 
@@ -282,6 +281,14 @@ public class WebServiceEndpoints
     }
 
     @ResponseBody
+    @PostMapping("/hdls/receivePreviousMessageSignature")
+    public String receivePreviousMessageSignature(@RequestBody Signature  signature)
+    {
+        String ret = this.webServiceEngine.addPreviousBlockRevisionResultSignature(signature);
+        return ret;
+    }
+
+    @ResponseBody
     @PostMapping("/hdls/getIPAddress")
     public String getIPAddress(@RequestBody String id)
     {
@@ -430,6 +437,10 @@ public class WebServiceEndpoints
             return "Current validator node not found in Status contract";
         }
         validatorNode = validatorNodeOptional.get();
+        if(!ValidatorNode.validateConnectionString(validatorNode.getConnectionString()))
+        {
+            return "Invalid connection string";
+        }
         if(validatorNode.getAddress() == null)
         {
             Map<Integer,Integer> address = new HashMap<Integer,Integer>();
@@ -497,6 +508,41 @@ public class WebServiceEndpoints
         webServiceEngine.getPendingNextMessage().setVotedParameterChanges(_LedgerParameters);
         //}
     }
+
+
+    @ResponseBody
+    @PostMapping("/hdls-server-admin/generatePreviousMessageSignature")
+    public String generatePreviousMessageSignature(@RequestBody String  connectionString)
+    {
+        BlockRevisionResult result = new BlockRevisionResult();
+
+        StatusDataContract statusDataContract = WebServiceCaller.callServerMethodThrows(connectionString, "hdls/getStatus", null,new TypeReference<>() {});
+        TransportMessageDataContract transportMessageDataContract = WebServiceCaller.callServerMethodThrows(
+                connectionString,
+                "hdls/getCurrentlyTransmittedTransportMessage",
+                null,
+                new TypeReference<>() {
+                }
+        );
+
+        TransportMessageDataContract myTransportMessageDataContract = new TransportMessageDataContract();
+        myTransportMessageDataContract.setBlockId(transportMessageDataContract.getBlockId());
+        myTransportMessageDataContract.setBlockRevision(transportMessageDataContract.getBlockRevision());
+        myTransportMessageDataContract.setBlockTempVersion(transportMessageDataContract.getBlockTempVersion());
+        myTransportMessageDataContract.setSignedValidatorMessages( new HashSet<>());
+        myTransportMessageDataContract.signContract(this.webServiceEngine.getEncryptionEntity());
+        myTransportMessageDataContract.computeHash();
+
+        transportMessageDataContract.nameToPublicKey(statusDataContract.getDistributedLedgerAccounts());
+        myTransportMessageDataContract.storeDataContract(transportMessageDataContract, this.webServiceEngine.getEncryptionEntity());
+
+        result.init(myTransportMessageDataContract,myTransportMessageDataContract,statusDataContract);
+        Signature s = Signature.create(this.webServiceEngine.getEncryptionEntity().getPublicKey(),result.getStringToSign(), this.webServiceEngine.getEncryptionEntity().signMessage(result.getStringToSign()));
+        String ret = WebServiceCaller.callServerMethodThrows(connectionString, "hdls/receivePreviousMessageSignature", s,new TypeReference<String>() {});
+        return ret;
+    }
+    //TODO generate the screen to trigger generatePreviousMessageSignature
+
 
     /**
      * Displays the form page for setting up integrated encryption entity.
@@ -695,6 +741,23 @@ public class WebServiceEndpoints
                 "\"\n" +
                 "}\n" +
                 "]}");
+        return "JSONInput";
+    }
+
+    /**
+     * Displays the form page for adding your signature for messages onto an external validator node.
+     * Provides interface for specifying connection strings for network joining.
+     *
+     * @param model Spring MVC model for passing form configuration to the view
+     * @return String view name "JSONInput" for the join ledger form
+     */
+    @GetMapping("/hdls-server-admin/generatePreviousMessageSignature")
+    public String generatePreviousMessageSignatureGet(Model model) {
+        model.addAttribute("apiEndpoint","/hdls-server-admin/generatePreviousMessageSignature");
+        model.addAttribute("title","Cosign a message for a connected endpoint");
+        model.addAttribute("info","");
+        model.addAttribute("jsonLabel","Paste server connection string here:");
+        model.addAttribute("jsonDefault","");
         return "JSONInput";
     }
 }

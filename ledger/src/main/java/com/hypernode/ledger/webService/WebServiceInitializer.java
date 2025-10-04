@@ -47,7 +47,7 @@ public class WebServiceInitializer {
         authenticationString = WebServiceCaller.callServerMethodThrows(_connectionStringServer, "hdls/requestAuthenticationStringToSign",
                 null, new TypeReference<>() {
                 });
-        WebServiceEndpoints.AuthenticateServerRequest request = new WebServiceEndpoints.AuthenticateServerRequest(_this.getEncryptionEntity().getPublicKey(), _this.getEncryptionEntity().signMessage(authenticationString), _thisConnectionString, _this.getEncryptionEntity().signMessage(_thisConnectionString));
+        WebServiceEndpoints.AuthenticateServerRequest request = new WebServiceEndpoints.AuthenticateServerRequest(_this.getEncryptionEntity().getPublicKey(), _this.getEncryptionEntity().signMessage(authenticationString), _thisConnectionString, _this.getEncryptionEntity().signMessage(_this.getEncryptionEntity().getPublicKey()+_thisConnectionString));
         if(WebServiceCaller.callServerMethodThrows(_connectionStringServer, "hdls/authenticateServer", request, new TypeReference<Boolean>() {
         }))
         {
@@ -83,7 +83,7 @@ public class WebServiceInitializer {
         _this.pendingNextMessage.setPaymentSet( new HashSet<>());
         _this.pendingNextMessage.setValidatorNodes(new HashSet<>());
         _this.pendingNextMessage.setVotedParameterChanges(_lastDataContract.getLedgerParameters());
-        _this.blockRevisionResult = BlockRevisionResult.processRevision(_this.transportMessageDataContract,_this.statusDataContract);
+        _this.blockRevisionResult = BlockRevisionResult.processRevision(_this.transportMessageDataContract,_this.transportMessageDataContract,_this.statusDataContract);
         //you are now authenticated, at the next block revision the Validator list will be updated
         //and at the next one you will be able to exchange messages
         //with the other servers.

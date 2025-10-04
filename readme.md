@@ -1,5 +1,3 @@
-
-
 # Hypernode distributed ledger system
 
 This program aims to create a distributed ledger with the goal of illustrating the Hypernode validation algorithm.  
@@ -16,7 +14,9 @@ but at the same time a motivated user could run his own validatorNode.
 The power and computation were also a concern, especially as that GPU power could now be allocated to AI.  
 Another reason I was not fully happy with Bitcoin was the lack of an internal formal voting system, and the inability to
 issue new currency without recurring to an hard fork.  
-Since this system is based on the delegated validatornodes to manage monetary policy this is, in fact, a democratic instrument.  
+This system is based on delegated validatornodes to manage monetary policy, which means that the ledger continuity (the creation of new blocks)
+is based off the agreement of 50% +1 of the electronic voting, casted directly or via delegation through electronic signatures.
+This is, therefore, a democratic instrument.  
 If you so desire you do not even need the Internet to run this kind of ledger, you could run one entirely via avian carriers,
 therefore becoming an important asset for communities that can't or won't connect to the mainstream Internet.  
 Despite those critiques Bitcoin has undoubtedly paved the road for a lot of these concepts, this project is more of a fine tune of a good idea according to my specific taste, requirements and my personal flavour of autism and not about throwing shade at a successful project.
@@ -271,6 +271,7 @@ The endpoints to forward are contained in the /hdls/ subfolder (Hypernode Distri
 /hdls/getCurrentlyTransmittedTransportMessage
 /hdls/getAccountInfo
 /hdls/getIPAddress
+/hdls/receivePreviousMessageSignature
 
 #### Initializing the server
 
@@ -383,6 +384,14 @@ List of ValidatorNodes, which contains the references to the other peers in the 
   This is how you can "print money" and finance your community endeavors.  
   Call the endpoint /hdls/changeVotedParameters to pass the desired parameters, and keep an eye on the transaction history
   (as you need to coordinate, because only when you get over 50% of the votes the system changes setup)
+- Getting unstuck
+  Since only the people currently in the validatornodes are communicating it is possible that due to disconnections
+  there might not be enough voting weights in the current pool of connected validatornodes to approve a new block.
+  In that case if you have voting weight but are not connected to the network you can call the endpoint InitAndConnectToExistingLedger  
+  (endpoint WebServiceEndpoints.generatePreviousMessageSignature(), webpage /hdls-server-admin/receivePreviousMessageSignature)  
+  to connect to the specified target node and cosign the valid elements of that node.
+  Your signature will be computed with the other ones for that specific frame, adding the required missing weights
+  and allowing the system to get out of that deadlock scenario
 
 #### Tips for a better experience
 
