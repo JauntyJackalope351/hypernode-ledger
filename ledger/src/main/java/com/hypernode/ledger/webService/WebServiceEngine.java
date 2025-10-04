@@ -26,6 +26,7 @@ public class WebServiceEngine {
     TransportMessageDataContract transportMessageDataContract;
     TransportMessageDataContract currentlyTransmittedTransportMessage;
     TransportMessageDataContract nextTransmittedTransportMessage;
+    TransportMessageDataContract previousRevisionTransportMessageDataContract;
     ValidatorMessageDataContract pendingNextMessage;
     ValidatorNode thisValidatorNode;
     List<ValidatorNode> peers;
@@ -59,8 +60,7 @@ public class WebServiceEngine {
 
     public void TimedReadingEvent()
     {
-        //TODO use executors to read in parallel?
-        // no, i would have to rewrite everything to be thread safe.
+        //INFO to use executors to read in parallel you would have to rewrite and retest everything to be thread safe.
         List<ValidatorNode> retryPeers = new ArrayList<>();
         for (ValidatorNode peer : this.peers)
         {
@@ -127,7 +127,7 @@ public class WebServiceEngine {
         try
         {
             _dataContract.nameToPublicKey(this.statusDataContract.getDistributedLedgerAccounts());
-            //TODO now the system is strict and only receives from your peers
+            //INFO now the system is strict and only receives from your peers
             // to avoid ddos or flooding.
             // if you want to manually enter the messages use this line instead
             // validatorNode = ValidatorNode.findByPublicKey(this.statusDataContract.getValidatorNodeList(), _dataContract.getSignature().getPublicKey());
@@ -208,7 +208,9 @@ public class WebServiceEngine {
 
     private TransportMessageDataContract processDataContractRevision()
     {
-        this.blockRevisionResult = BlockRevisionResult.processRevision(transportMessageDataContract, statusDataContract);
+        this.blockRevisionResult = BlockRevisionResult.processRevision(previousRevisionTransportMessageDataContract,transportMessageDataContract, statusDataContract);
+        this.previousRevisionTransportMessageDataContract = transportMessageDataContract.hardCopy();
+
         // checking if block revision result has a majority of the votes with the weights
         if (this.blockRevisionResult.isValid())
         {
@@ -243,6 +245,33 @@ public class WebServiceEngine {
         this.transportMessageDataContract.setPreviousBlockRevisionResultSignatures(previousBlockRevisionResultSignatures);
 
         return newMessage;
+    }
+
+    public String addPreviousBlockRevisionResultSignature(Signature s)
+    {
+        if(this.transportMessageDataContract.getBlockRevision()<3)
+        {
+            return "not enough revisions to accept a signature";
+        }
+        if(!blockRevisionResult.isCurrentRevisionSignature(s))
+        {
+            return "invalid signature for this revision";
+        }
+        if(this.transportMessageDataContract.getBlockTempVersion()!=1
+                || this.transportMessageDataContract.getBlockRevision() % 2 == 0
+                || this.currentlyTransmittedTransportMessage.getBlockRevision()
+                    == this.transportMessageDataContract.getBlockRevision()
+        )
+        {   //the signature needs to be added while this server is transmitting the last blocktempversion
+            // of the current  message (that will soon become the previous message)
+            // and the system has already calculated the next transportmessage (so this signature can be appended there)
+            return "message not received within the correct timeframe";
+        }
+        else
+        {
+            this.transportMessageDataContract.getPreviousBlockRevisionResultSignatures().add(s);
+            return "OK";
+        }
     }
 
     /**
@@ -307,7 +336,7 @@ public class WebServiceEngine {
     public boolean authenticateServer(String _publicKey, String _signedMessage, String _connectionString, String _signedConnectionString) {
         if (
                 !Encryption.verifySignedMessage(this.requestAuthenticationStringToSign(), _publicKey, _signedMessage)
-                || !Encryption.verifySignedMessage(_connectionString, _publicKey, _signedConnectionString)
+                || !Encryption.verifySignedMessage(_publicKey+_connectionString, _publicKey, _signedConnectionString)
         ) {
             //this authentication failed
             return false;
@@ -413,7 +442,7 @@ public class WebServiceEngine {
             account = this.statusDataContract.getAccountsList().stream().filter(d -> d.getName().equals(id)).findFirst().orElse(new DistributedLedgerAccount());
         }
         else
-        {//TODO postman has a bug where the id gets truncated when it has a "+" in it
+        {//INFO postman has a bug where the id gets truncated when it has a "+" in it
             account = this.statusDataContract.getAccountsList().stream().filter(d -> d.getPublicKey().equals(id)).findFirst().orElse(new DistributedLedgerAccount());
         }
         if(account.getPublicKey().isEmpty())

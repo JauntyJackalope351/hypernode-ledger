@@ -143,7 +143,7 @@ public class DistributedLedgerAccount
         {
             this.name = name.substring(0,200);
         }
-    }//TODO accountNameLength as parameter?
+    }//INFO accountNameLength is not a parameter as it needs to be shorter than the public key
     public void setDescription(String description){
         this.description = description;
         if(description.length()>2000)

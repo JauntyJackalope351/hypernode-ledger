@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 public class BlockRevisionResult
 {
     TransportMessageDataContract transportMessageDataContractReceived;
+    TransportMessageDataContract previousTransportMessageDataContractReceived;
     StatusDataContract statusDataContractStarting;
     StatusDataContract newStatusDataContract;
     Set<String> bannedValidators;
@@ -18,28 +19,30 @@ public class BlockRevisionResult
     Set<String> validValidatorNodes;
     Map<String, BigDecimal> delegatedAmounts;
     @JsonIgnore
-    public static BlockRevisionResult processRevision(TransportMessageDataContract transportMessageDataContract, StatusDataContract statusDataContract)
+    public static BlockRevisionResult processRevision(TransportMessageDataContract previousRevisionTransportMessageDataContract, TransportMessageDataContract transportMessageDataContract, StatusDataContract statusDataContract)
     {
         BlockRevisionResult blockRevisionResult = new BlockRevisionResult();
-        blockRevisionResult.init(transportMessageDataContract,statusDataContract);
+        blockRevisionResult.init(previousRevisionTransportMessageDataContract, transportMessageDataContract,statusDataContract);
         return blockRevisionResult;
     }
 
-    public void init(TransportMessageDataContract transportMessageDataContract, StatusDataContract statusDataContract) {
+    public void init(TransportMessageDataContract previousRevisionTransportMessageDataContract, TransportMessageDataContract transportMessageDataContract, StatusDataContract statusDataContract) {
 
+        this.previousTransportMessageDataContractReceived = previousRevisionTransportMessageDataContract;
         this.transportMessageDataContractReceived = transportMessageDataContract;
         this.statusDataContractStarting = statusDataContract;
         this.validValidatorNodes = new HashSet<>();
         this.isValid = false;
 
         // add to the bannedvalidators those who have multiple message for same block
-        this.bannedValidators = SignedValidatorMessage.getBannedValidators(transportMessageDataContract.getSignedValidatorMessages(),statusDataContract);
-        if(transportMessageDataContract.getBlockRevision() < statusDataContract.getLedgerParameters().getMessageTransmissionsPerBlock())
+        this.bannedValidators = BlockRevisionResult.getBannedValidators(transportMessageDataContract.getSignedValidatorMessages(),statusDataContract);
+        if(transportMessageDataContract.getBlockRevision() < statusDataContract.getLedgerParameters().getMessageTransmissionsPerBlock()
+        || transportMessageDataContract.getBlockRevision() % 2 == 0)
         {
             return;
         }
 
-        this.bannedValidators.addAll(this.invalidPreviousRevisionResultsSignatures());
+        this.bannedValidators.addAll(this.multisignedPreviousRevisionResultsSignatures());
 
         // checking if validatormesssagedatacontract has a majority of the votes
         // with the weights
@@ -72,14 +75,43 @@ public class BlockRevisionResult
             }
         }
     }
-    @JsonIgnore
-    public Set<String> invalidPreviousRevisionResultsSignatures()
+
+    public static Set<String> getBannedValidators(Set<SignedValidatorMessage> _messages,StatusDataContract status)
     {
-        String prefix = ""+this.transportMessageDataContractReceived.getBlockId() +
-                this.transportMessageDataContractReceived.getBlockRevision() +
-                this.statusDataContractStarting.getHash() ;
-        Set<Signature> signatures = this.transportMessageDataContractReceived
-                .getPreviousBlockRevisionResultSignatures().stream().filter(s -> s.validate() && s.getMessageValue().startsWith(prefix)).collect(Collectors.toSet());
+        Set<String> ret = new HashSet<>();
+        //filter by making sure we're only getting the messages from this block id and with valid signatures
+        Set<SignedValidatorMessage> messages = _messages.stream().filter(m -> m.getContract().getId() == status.getId()+1 && m.validateSignature()).collect(Collectors.toSet());
+        //group into a map, where the key is the publickey and the value is the list of values for this
+        Map<String, List<SignedValidatorMessage>> collect = messages.stream().collect(Collectors.groupingBy(m -> m.getOriginalSignature().getPublicKey()));
+        //if someone sent two different messages with the same id they should be banned
+        ret.addAll(collect.entrySet().stream().filter(e -> e.getValue().size()>1).map(e-> e.getKey()).toList());
+        //also add to the ban list elements that send a clearly invalid message
+        ret.addAll(messages.stream().filter(m-> !m.getContract().isValid(m.getOriginalSignature().getPublicKey(),status)).map(m-> m.getOriginalSignature().getPublicKey()).toList());
+        return ret;
+    }
+
+    public boolean isPreviousRevisionSignature(Signature s)
+    {
+        String prefix = "ID" + this.previousTransportMessageDataContractReceived.getBlockId() +
+                "R" + this.previousTransportMessageDataContractReceived.getBlockRevision() +
+                ":" + this.statusDataContractStarting.getHash();
+        return s.validate() && s.getMessageValue().startsWith(prefix);
+    }
+
+    public boolean isCurrentRevisionSignature(Signature s)
+    {
+        String prefix = "ID" + this.transportMessageDataContractReceived.getBlockId() +
+                "R" + this.transportMessageDataContractReceived.getBlockRevision() +
+                ":" + this.statusDataContractStarting.getHash();
+        return s.validate() && s.getMessageValue().startsWith(prefix);
+    }
+
+        @JsonIgnore
+    public Set<String> multisignedPreviousRevisionResultsSignatures()
+    {
+
+        Set<Signature> signatures =this.transportMessageDataContractReceived
+                .getPreviousBlockRevisionResultSignatures().stream().filter(this::isPreviousRevisionSignature).collect(Collectors.toSet());
         Map<String, List<Signature>> collect = signatures.stream().collect(Collectors.groupingBy(Signature::getPublicKey));
         return collect.entrySet().stream().filter(e -> e.getValue().size()>1).map(Map.Entry::getKey).sorted().collect(Collectors.toSet());
 
@@ -94,12 +126,12 @@ public class BlockRevisionResult
                 "R" + this.transportMessageDataContractReceived.getBlockRevision() +
                 ":" + this.statusDataContractStarting.getHash() +
                 ":" + this.bannedValidators.stream().sorted().collect(Collectors.joining("|")) +
-                ":" + this.getResultingMessage().getStringToSign();
+                ":" + this.getResultingMessage(transportMessageDataContractReceived).getStringToSign();
     }
     @JsonIgnore
     public LedgerParameters getResultingLedgerParameters()
     {
-        Set<SignedValidatorMessage> messages = this.transportMessageDataContractReceived.getSignedValidatorMessages().stream()
+        Set<SignedValidatorMessage> messages = this.previousTransportMessageDataContractReceived.getSignedValidatorMessages().stream()
                 .filter(s -> this.validValidatorNodes.contains(s.getOriginalSignature().getPublicKey())).collect(Collectors.toSet());
         BigDecimal minVal = delegatedAmounts.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.TWO);
         //messages.stream().filter(s-> !this.validValidatorNodes.contains(s.getOriginalSignature().getPublicKey())).toList().forEach(messages::remove);
@@ -133,12 +165,12 @@ public class BlockRevisionResult
     }
     @JsonIgnore
     //regroup data at the end of the message exchange
-    public ValidatorMessageDataContract getResultingMessage()
+    public ValidatorMessageDataContract getResultingMessage(TransportMessageDataContract _message)
     {
         ValidatorMessageDataContract returnMessage = new ValidatorMessageDataContract();
         Iterator<SignedValidatorMessage> signedValidatorMessagesIterator;
         SignedValidatorMessage signedValidatorMessage;
-        signedValidatorMessagesIterator = this.transportMessageDataContractReceived.getSignedValidatorMessages().iterator();
+        signedValidatorMessagesIterator = _message.getSignedValidatorMessages().iterator();
 
         while(signedValidatorMessagesIterator.hasNext())
         {
@@ -159,7 +191,7 @@ public class BlockRevisionResult
         newStatusDataContract.setHashPreviousBlock(this.statusDataContractStarting.getHash());
 
 
-        ValidatorMessageDataContract validatorMessageDataContract = this.getResultingMessage();
+        ValidatorMessageDataContract validatorMessageDataContract = this.getResultingMessage(this.previousTransportMessageDataContractReceived);
         Set<DistributedLedgerAccount> newDistributedLedgerAccountList = this.statusDataContractStarting.getAccountsList();
         this.statusDataContractStarting.getAccountsList().stream().filter(c -> this.getBannedValidators().contains(c.getPublicKey())).toList().forEach(newDistributedLedgerAccountList::remove);
         newDistributedLedgerAccountList =
