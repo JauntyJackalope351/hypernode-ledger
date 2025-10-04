@@ -77,7 +77,10 @@ public class StatusDataContract
         s.id = id;
         s.signature=signature;
         s.distributedLedgerAccounts = new HashSet<>();
-        s.distributedLedgerAccounts.addAll(distributedLedgerAccounts);
+        if(distributedLedgerAccounts != null)
+        {
+            s.distributedLedgerAccounts.addAll(distributedLedgerAccounts);
+        }
         s.validatorNodeList = validatorNodeList;
         s.ledgerParameters = ledgerParameters;
         s.nextLedgerParameters = nextLedgerParameters;

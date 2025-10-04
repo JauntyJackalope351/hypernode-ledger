@@ -77,21 +77,6 @@ public class SignedValidatorMessage
         }
     }
 
-
-    public static Set<String> getBannedValidators(Set<SignedValidatorMessage> _messages,StatusDataContract status)
-    {
-        Set<String> ret = new HashSet<>();
-        //filter by making sure we're only getting the messages from this revision and with a valid signature
-        Set<SignedValidatorMessage> messages = _messages.stream().filter(m -> m.contract.getId() == status.getId() && m.validateSignature()).collect(Collectors.toSet());
-        //group into a map, where the key is the publickey and the value is the list of values for this
-        Map<String, List<SignedValidatorMessage>> collect = messages.stream().collect(Collectors.groupingBy(m -> m.originalSignature.getPublicKey()));
-        //if someone sent two different messages with the same id they should be banned
-        ret.addAll(collect.entrySet().stream().filter(e -> e.getValue().size()>1).map(e-> e.getKey()).toList());
-        //also add to the ban list elements that send a clearly invalid message
-        ret.addAll(messages.stream().filter(m-> !m.contract.isValid(m.originalSignature.getPublicKey(),status)).map(m-> m.originalSignature.getPublicKey()).toList());
-        return ret;
-    }
-
     public static String SetToString(Set<SignedValidatorMessage> _messages)
     {
         if(_messages == null)
